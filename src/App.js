@@ -193,7 +193,7 @@ const VEXLifetimeAchievementSystem = () => {
     },
   ]);
 
-  const [currentSession, setCurrentSession] = useState("Summer 2025 - Week 3");
+  const [currentSession, setCurrentSession] = useState("");
   const [sessions, setSessions] = useState([]);
   const [showSessionManager, setShowSessionManager] = useState(false);
 
@@ -284,6 +284,15 @@ const VEXLifetimeAchievementSystem = () => {
     if (savedSessions) {
       const parsedSessions = JSON.parse(savedSessions);
       setSessions(migrateSessionsToNewFormat(parsedSessions));
+
+      // If no current session saved, use first active session
+      if (!savedCurrentSession && parsedSessions.length > 0) {
+        const migrated = migrateSessionsToNewFormat(parsedSessions);
+        const firstActive = migrated.find((s) => s.isActive);
+        if (firstActive) {
+          setCurrentSession(firstActive.name);
+        }
+      }
     }
     if (savedCurrentSession) setCurrentSession(savedCurrentSession);
     if (savedMilestones) setStudentMilestones(JSON.parse(savedMilestones));
@@ -432,83 +441,6 @@ const VEXLifetimeAchievementSystem = () => {
       })
     );
   };
-
-  // // Award achievement - Simple idempotent version
-  // const awardAchievement = (studentId, achievementId) => {
-  //   const achievement = achievements.find((a) => a.id === achievementId);
-  //   if (!achievement) return;
-
-  //   // Check BEFORE state update to show alerts
-  //   const student = students.find((s) => s.id === studentId);
-  //   if (!student) return;
-
-  //   if (
-  //     achievement.type === "lifetime" &&
-  //     student.achievements?.includes(achievementId)
-  //   ) {
-  //     alert(`${student.name} already earned "${achievement.name}"!`);
-  //     return;
-  //   }
-
-  //   if (achievement.type === "session") {
-  //     const currentSessionAchievements =
-  //       student.sessionAchievements?.[currentSession] || [];
-  //     if (currentSessionAchievements.includes(achievementId)) {
-  //       alert(
-  //         `${student.name} already earned "${achievement.name}" this session!`
-  //       );
-  //       return;
-  //     }
-  //   }
-
-  //   // Now do the state update
-  //   setStudents((prev) => {
-  //     return prev.map((s) => {
-  //       if (s.id !== studentId) return s;
-
-  //       const updatedStudent = { ...s };
-
-  //       if (achievement.type === "lifetime") {
-  //         // Check again to be idempotent
-  //         if (!s.achievements?.includes(achievementId)) {
-  //           updatedStudent.achievements = [
-  //             ...(s.achievements || []),
-  //             achievementId,
-  //           ];
-  //           updatedStudent.lifetimeXP = (s.lifetimeXP || 0) + achievement.xp;
-  //         }
-  //       } else {
-  //         // Session achievement
-  //         const existingAchievements =
-  //           s.sessionAchievements?.[currentSession] || [];
-
-  //         if (!existingAchievements.includes(achievementId)) {
-  //           // Initialize if needed
-  //           if (!updatedStudent.sessionAchievements) {
-  //             updatedStudent.sessionAchievements = {};
-  //           }
-  //           updatedStudent.sessionAchievements[currentSession] = [
-  //             ...existingAchievements,
-  //             achievementId,
-  //           ];
-
-  //           if (!updatedStudent.sessionXP) {
-  //             updatedStudent.sessionXP = {};
-  //           }
-  //           updatedStudent.sessionXP[currentSession] =
-  //             (s.sessionXP?.[currentSession] || 0) + achievement.xp;
-
-  //           // Lifetime XP
-  //           const lifetimeContribution = Math.floor(achievement.xp * 0.3);
-  //           updatedStudent.lifetimeXP =
-  //             (s.lifetimeXP || 0) + lifetimeContribution;
-  //         }
-  //       }
-
-  //       return updatedStudent;
-  //     });
-  //   });
-  // };
 
   // Award achievement - SIMPLE FINAL VERSION
   const awardAchievement = (studentId, achievementId) => {
@@ -721,6 +653,7 @@ const VEXLifetimeAchievementSystem = () => {
   const StudentManager = () => {
     const [newStudentName, setNewStudentName] = useState("");
     const [newStudentProgram, setNewStudentProgram] = useState("VEX IQ");
+    const [searchFilter, setSearchFilter] = useState("");
 
     const handleAddStudent = () => {
       if (newStudentName.trim()) {
@@ -790,109 +723,135 @@ const VEXLifetimeAchievementSystem = () => {
               this session.
             </p>
           </div>
+          {/* Search Filter */}
+          <div className="mb-4">
+            <input
+              type="text"
+              placeholder="🔍 Search students by name..."
+              value={searchFilter}
+              onChange={(e) => setSearchFilter(e.target.value)}
+              className="w-full px-4 py-2 border rounded-lg"
+            />
+          </div>
+
+          <div className="mb-2 text-sm text-gray-600">
+            Showing{" "}
+            {
+              students.filter((s) =>
+                s.name.toLowerCase().includes(searchFilter.toLowerCase())
+              ).length
+            }{" "}
+            of {students.length} students
+          </div>
 
           <div className="space-y-2">
-            {students.map((student) => (
-              <div
-                key={student.id}
-                className="flex items-center justify-between p-3 bg-gray-50 rounded"
-              >
-                <div className="flex items-center gap-3 flex-1">
-                  <span className="text-2xl">{student.avatar}</span>
-                  <div className="flex-1">
-                    <div className="font-semibold">{student.name}</div>
-                    <div className="text-sm text-gray-600">
-                      {student.program} • Lifetime: {student.lifetimeXP} XP •
-                      Session: {getSessionXP(student)} XP
-                    </div>
-                    <div className="text-xs text-gray-500 mt-1">
-                      Enrolled in:{" "}
-                      {(
-                        student.enrolledSessions ||
-                        student.sessionsAttended ||
-                        []
-                      )
-                        .filter((session) =>
-                          sessions.some((s) => s.name === session && s.isActive)
+            {students
+              .filter((student) =>
+                student.name.toLowerCase().includes(searchFilter.toLowerCase())
+              )
+              .map((student) => (
+                <div
+                  key={student.id}
+                  className="flex items-center justify-between p-3 bg-gray-50 rounded"
+                >
+                  <div className="flex items-center gap-3 flex-1">
+                    <span className="text-2xl">{student.avatar}</span>
+                    <div className="flex-1">
+                      <div className="font-semibold">{student.name}</div>
+                      <div className="text-sm text-gray-600">
+                        {student.program} • Lifetime: {student.lifetimeXP} XP •
+                        Session: {getSessionXP(student)} XP
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        Enrolled in:{" "}
+                        {(
+                          student.enrolledSessions ||
+                          student.sessionsAttended ||
+                          []
                         )
-                        .join(", ") || "No sessions"}
+                          .filter((session) =>
+                            sessions.some(
+                              (s) => s.name === session && s.isActive
+                            )
+                          )
+                          .join(", ") || "No sessions"}
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => {
-                      const isEnrolled =
-                        student.enrolledSessions?.includes(currentSession) ||
-                        student.sessionsAttended?.includes(currentSession);
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        const isEnrolled =
+                          student.enrolledSessions?.includes(currentSession) ||
+                          student.sessionsAttended?.includes(currentSession);
 
-                      if (isEnrolled) {
-                        // Unenroll
-                        setStudents(
-                          students.map((s) =>
-                            s.id === student.id
-                              ? {
-                                  ...s,
-                                  enrolledSessions: (
-                                    s.enrolledSessions ||
-                                    s.sessionsAttended ||
-                                    []
-                                  ).filter(
-                                    (session) => session !== currentSession
-                                  ),
-                                  sessionsAttended: (
-                                    s.sessionsAttended || []
-                                  ).filter(
-                                    (session) => session !== currentSession
-                                  ),
-                                }
-                              : s
-                          )
-                        );
-                      } else {
-                        // Enroll
-                        setStudents(
-                          students.map((s) =>
-                            s.id === student.id
-                              ? {
-                                  ...s,
-                                  enrolledSessions: [
-                                    ...(s.enrolledSessions ||
+                        if (isEnrolled) {
+                          // Unenroll
+                          setStudents(
+                            students.map((s) =>
+                              s.id === student.id
+                                ? {
+                                    ...s,
+                                    enrolledSessions: (
+                                      s.enrolledSessions ||
                                       s.sessionsAttended ||
-                                      []),
-                                    currentSession,
-                                  ],
-                                  sessionsAttended: [
-                                    ...(s.sessionsAttended || []),
-                                    currentSession,
-                                  ],
-                                }
-                              : s
-                          )
-                        );
-                      }
-                    }}
-                    className={`px-3 py-1 rounded text-white ${
-                      student.enrolledSessions?.includes(currentSession) ||
+                                      []
+                                    ).filter(
+                                      (session) => session !== currentSession
+                                    ),
+                                    sessionsAttended: (
+                                      s.sessionsAttended || []
+                                    ).filter(
+                                      (session) => session !== currentSession
+                                    ),
+                                  }
+                                : s
+                            )
+                          );
+                        } else {
+                          // Enroll
+                          setStudents(
+                            students.map((s) =>
+                              s.id === student.id
+                                ? {
+                                    ...s,
+                                    enrolledSessions: [
+                                      ...(s.enrolledSessions ||
+                                        s.sessionsAttended ||
+                                        []),
+                                      currentSession,
+                                    ],
+                                    sessionsAttended: [
+                                      ...(s.sessionsAttended || []),
+                                      currentSession,
+                                    ],
+                                  }
+                                : s
+                            )
+                          );
+                        }
+                      }}
+                      className={`px-3 py-1 rounded text-white ${
+                        student.enrolledSessions?.includes(currentSession) ||
+                        student.sessionsAttended?.includes(currentSession)
+                          ? "bg-gray-500 hover:bg-gray-600"
+                          : "bg-green-500 hover:bg-green-600"
+                      }`}
+                    >
+                      {student.enrolledSessions?.includes(currentSession) ||
                       student.sessionsAttended?.includes(currentSession)
-                        ? "bg-gray-500 hover:bg-gray-600"
-                        : "bg-green-500 hover:bg-green-600"
-                    }`}
-                  >
-                    {student.enrolledSessions?.includes(currentSession) ||
-                    student.sessionsAttended?.includes(currentSession)
-                      ? "Unenroll"
-                      : "Enroll"}
-                  </button>
-                  <button
-                    onClick={() => removeStudent(student.id)}
-                    className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
-                  >
-                    Remove
-                  </button>
+                        ? "Unenroll"
+                        : "Enroll"}
+                    </button>
+                    <button
+                      onClick={() => removeStudent(student.id)}
+                      className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
+                    >
+                      Remove
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
           </div>
         </div>
       </div>
@@ -2680,6 +2639,20 @@ const VEXLifetimeAchievementSystem = () => {
                                 Current
                               </span>
                             )}
+                            {/* Add enrolled count */}
+                            <span className="text-sm text-gray-500">
+                              (
+                              {
+                                students.filter(
+                                  (s) =>
+                                    s.enrolledSessions?.includes(
+                                      session.name
+                                    ) ||
+                                    s.sessionsAttended?.includes(session.name)
+                                ).length
+                              }{" "}
+                              students)
+                            </span>
                           </div>
                           <div className="text-sm text-gray-600 mt-1">
                             <span
