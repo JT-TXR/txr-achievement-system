@@ -1836,6 +1836,10 @@ const VEXLifetimeAchievementSystem = () => {
   const BulkAchievementAward = () => {
     const [selectedAchievement, setSelectedAchievement] = useState("");
     const [awardSuccess, setAwardSuccess] = useState(false);
+    const [awardResults, setAwardResults] = useState({
+      success: 0,
+      skipped: 0,
+    });
 
     const sessionCategory = getSessionCategory(currentSession);
     const availableAchievements = achievements.filter(
@@ -1849,19 +1853,57 @@ const VEXLifetimeAchievementSystem = () => {
     const handleBulkAward = () => {
       if (!selectedAchievement || bulkSelectedStudents.length === 0) return;
 
+      const achievement = achievements.find(
+        (a) => a.id === parseInt(selectedAchievement)
+      );
+      if (!achievement) return;
+
+      let successCount = 0;
+      let skippedCount = 0;
+
       // Award to all selected students
       bulkSelectedStudents.forEach((studentId) => {
-        awardAchievement(studentId, parseInt(selectedAchievement));
+        const student = students.find((s) => s.id === studentId);
+        if (!student) return;
+
+        // Check if already earned
+        let alreadyEarned = false;
+        if (achievement.type === "lifetime") {
+          alreadyEarned = student.achievements?.includes(achievement.id);
+        } else {
+          const sessionAchievements =
+            student.sessionAchievements?.[currentSession] || [];
+          alreadyEarned = sessionAchievements.includes(achievement.id);
+        }
+
+        if (!alreadyEarned) {
+          awardAchievement(studentId, achievement.id);
+          successCount++;
+        } else {
+          skippedCount++;
+        }
       });
 
-      // Show success message
+      // Show results
+      setAwardResults({ success: successCount, skipped: skippedCount });
       setAwardSuccess(true);
-      setTimeout(() => {
-        setAwardSuccess(false);
-        setShowBulkAward(false);
-        setBulkSelectedStudents([]);
-        setSelectedAchievement("");
-      }, 2000);
+
+      // Only close if at least one was successful
+      if (successCount > 0) {
+        setTimeout(() => {
+          setAwardSuccess(false);
+          setShowBulkAward(false);
+          setBulkSelectedStudents([]);
+          setSelectedAchievement("");
+          setAwardResults({ success: 0, skipped: 0 });
+        }, 3000);
+      } else {
+        // If all were skipped, just reset the success message
+        setTimeout(() => {
+          setAwardSuccess(false);
+          setAwardResults({ success: 0, skipped: 0 });
+        }, 3000);
+      }
     };
 
     const toggleStudent = (studentId) => {
@@ -1882,6 +1924,40 @@ const VEXLifetimeAchievementSystem = () => {
       setBulkSelectedStudents([]);
     };
 
+    // Preview which students already have the selected achievement
+    const getStudentAchievementStatus = (studentId) => {
+      if (!selectedAchievement)
+        return { hasAchievement: false, earnedCount: 0 };
+
+      const student = students.find((s) => s.id === studentId);
+      const achievement = achievements.find(
+        (a) => a.id === parseInt(selectedAchievement)
+      );
+
+      if (!student || !achievement)
+        return { hasAchievement: false, earnedCount: 0 };
+
+      if (achievement.type === "lifetime") {
+        return {
+          hasAchievement:
+            student.achievements?.includes(achievement.id) || false,
+          earnedCount: 0,
+        };
+      } else {
+        const currentSessionAchievements =
+          student.sessionAchievements?.[currentSession] || [];
+        const hasInCurrentSession = currentSessionAchievements.includes(
+          achievement.id
+        );
+        const earnedCount = getAchievementEarnCount(student, achievement.id);
+
+        return {
+          hasAchievement: hasInCurrentSession,
+          earnedCount: earnedCount,
+        };
+      }
+    };
+
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
         <div className="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
@@ -1892,6 +1968,8 @@ const VEXLifetimeAchievementSystem = () => {
                 setShowBulkAward(false);
                 setBulkSelectedStudents([]);
                 setSelectedAchievement("");
+                setAwardSuccess(false);
+                setAwardResults({ success: 0, skipped: 0 });
               }}
               className="text-2xl hover:text-gray-600"
             >
@@ -1900,10 +1978,32 @@ const VEXLifetimeAchievementSystem = () => {
           </div>
 
           {awardSuccess && (
-            <div className="mb-4 p-4 bg-green-100 border border-green-300 rounded-lg">
-              <p className="text-green-800 font-semibold text-center">
-                ✅ Achievement awarded to {bulkSelectedStudents.length}{" "}
-                students!
+            <div
+              className={`mb-4 p-4 rounded-lg ${
+                awardResults.success > 0
+                  ? "bg-green-100 border border-green-300"
+                  : "bg-yellow-100 border border-yellow-300"
+              }`}
+            >
+              <p
+                className={`font-semibold text-center ${
+                  awardResults.success > 0
+                    ? "text-green-800"
+                    : "text-yellow-800"
+                }`}
+              >
+                {awardResults.success > 0 &&
+                  `✅ Achievement awarded to ${awardResults.success} student${
+                    awardResults.success !== 1 ? "s" : ""
+                  }!`}
+                {awardResults.success > 0 && awardResults.skipped > 0 && " "}
+                {awardResults.skipped > 0 &&
+                  `⚠️ ${awardResults.skipped} student${
+                    awardResults.skipped !== 1 ? "s" : ""
+                  } already had this achievement.`}
+                {awardResults.success === 0 &&
+                  awardResults.skipped > 0 &&
+                  "⚠️ All selected students already have this achievement!"}
               </p>
             </div>
           )}
@@ -1912,6 +2012,12 @@ const VEXLifetimeAchievementSystem = () => {
           <div className="mb-6">
             <h3 className="text-lg font-bold mb-3">Step 1: Select Students</h3>
             <div className="flex gap-2 mb-3">
+              <button
+                onClick={selectAll}
+                className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm"
+              >
+                Select All
+              </button>
               <button
                 onClick={selectNone}
                 className="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm"
@@ -1924,35 +2030,47 @@ const VEXLifetimeAchievementSystem = () => {
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-48 overflow-y-auto p-2 bg-gray-50 rounded">
-              {students.map((student) => (
-                <label
-                  key={student.id}
-                  className={`flex items-center p-2 rounded border cursor-pointer transition-colors ${
-                    bulkSelectedStudents.includes(student.id)
-                      ? "bg-blue-100 border-blue-300"
-                      : "bg-white border-gray-200 hover:bg-gray-50"
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={bulkSelectedStudents.includes(student.id)}
-                    onChange={() => toggleStudent(student.id)}
-                    className="mr-2"
-                  />
-                  <span className="flex items-center gap-2">
-                    <span className="text-xl">{student.avatar}</span>
-                    <span
-                      className={
-                        bulkSelectedStudents.includes(student.id)
-                          ? "font-semibold"
-                          : ""
-                      }
-                    >
-                      {student.name}
+              {students.map((student) => {
+                const { hasAchievement, earnedCount } =
+                  getStudentAchievementStatus(student.id);
+                const isSelected = bulkSelectedStudents.includes(student.id);
+
+                return (
+                  <label
+                    key={student.id}
+                    className={`flex items-center p-2 rounded border cursor-pointer transition-colors relative ${
+                      isSelected
+                        ? "bg-blue-100 border-blue-300"
+                        : "bg-white border-gray-200 hover:bg-gray-50"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleStudent(student.id)}
+                      className="mr-2"
+                    />
+                    <span className="flex items-center gap-2 flex-1">
+                      <span className="text-xl">{student.avatar}</span>
+                      <span className={isSelected ? "font-semibold" : ""}>
+                        {student.name}
+                      </span>
                     </span>
-                  </span>
-                </label>
-              ))}
+                    {selectedAchievement && hasAchievement && (
+                      <span className="text-xs bg-yellow-200 text-yellow-800 px-2 py-1 rounded ml-2">
+                        Has it
+                      </span>
+                    )}
+                    {selectedAchievement &&
+                      !hasAchievement &&
+                      earnedCount > 0 && (
+                        <span className="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded ml-2">
+                          {earnedCount}x
+                        </span>
+                      )}
+                  </label>
+                );
+              })}
             </div>
           </div>
 
@@ -1962,41 +2080,50 @@ const VEXLifetimeAchievementSystem = () => {
               Step 2: Select Achievement
             </h3>
 
-            {/* Session Achievements */}
-            <div className="mb-4">
-              <h4 className="text-md font-semibold mb-2 text-gray-700">
-                {currentSession} Achievements
-              </h4>
-              <select
-                value={selectedAchievement}
-                onChange={(e) => setSelectedAchievement(e.target.value)}
-                className="w-full p-3 border rounded"
-              >
-                <option value="">Select an achievement...</option>
-                <optgroup label="Session Achievements">
-                  {availableAchievements.map((achievement) => (
-                    <option key={achievement.id} value={achievement.id}>
-                      {achievement.icon} {achievement.name} ({achievement.xp}{" "}
-                      XP) - {achievement.description}
-                    </option>
-                  ))}
-                </optgroup>
-                <optgroup label="Lifetime Achievements">
-                  {lifetimeAchievements.map((achievement) => (
-                    <option key={achievement.id} value={achievement.id}>
-                      {achievement.icon} {achievement.name} ({achievement.xp}{" "}
-                      XP) - {achievement.description}
-                    </option>
-                  ))}
-                </optgroup>
-              </select>
-            </div>
+            <select
+              value={selectedAchievement}
+              onChange={(e) => setSelectedAchievement(e.target.value)}
+              className="w-full p-3 border rounded"
+            >
+              <option value="">Select an achievement...</option>
+              <optgroup label="Session Achievements">
+                {availableAchievements.map((achievement) => (
+                  <option key={achievement.id} value={achievement.id}>
+                    {achievement.icon} {achievement.name} ({achievement.xp} XP)
+                    - {achievement.description}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Lifetime Achievements">
+                {lifetimeAchievements.map((achievement) => (
+                  <option key={achievement.id} value={achievement.id}>
+                    {achievement.icon} {achievement.name} ({achievement.xp} XP)
+                    - {achievement.description}
+                  </option>
+                ))}
+              </optgroup>
+            </select>
 
             {selectedAchievement && (
-              <div className="p-3 bg-blue-50 rounded">
+              <div className="mt-3 p-3 bg-blue-50 rounded">
                 <p className="text-sm text-blue-800">
-                  <strong>Note:</strong> Students who already have this
-                  achievement will be skipped automatically.
+                  <strong>Preview:</strong>
+                  {(() => {
+                    const willReceive = bulkSelectedStudents.filter(
+                      (id) => !getStudentAchievementStatus(id).hasAchievement
+                    ).length;
+                    const alreadyHave =
+                      bulkSelectedStudents.length - willReceive;
+
+                    return (
+                      <span>
+                        {" "}
+                        {willReceive} student{willReceive !== 1 ? "s" : ""} will
+                        receive this achievement
+                        {alreadyHave > 0 && `, ${alreadyHave} already have it`}.
+                      </span>
+                    );
+                  })()}
                 </p>
               </div>
             )}
@@ -2009,6 +2136,8 @@ const VEXLifetimeAchievementSystem = () => {
                 setShowBulkAward(false);
                 setBulkSelectedStudents([]);
                 setSelectedAchievement("");
+                setAwardSuccess(false);
+                setAwardResults({ success: 0, skipped: 0 });
               }}
               className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
             >
