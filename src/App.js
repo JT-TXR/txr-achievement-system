@@ -213,6 +213,8 @@ const VEXLifetimeAchievementSystem = () => {
   const [showAchievementManager, setShowAchievementManager] = useState(false);
   const [xpToAward, setXpToAward] = useState(10);
   const [filterProgram, setFilterProgram] = useState("ALL");
+  const [showBulkAward, setShowBulkAward] = useState(false);
+  const [bulkSelectedStudents, setBulkSelectedStudents] = useState([]);
 
   // Tournament Management States
   const [teams, setTeams] = useState([]);
@@ -404,16 +406,92 @@ const VEXLifetimeAchievementSystem = () => {
     );
   };
 
-  // Award achievement - FIXED VERSION
+  // // Award achievement - Simple idempotent version
+  // const awardAchievement = (studentId, achievementId) => {
+  //   const achievement = achievements.find((a) => a.id === achievementId);
+  //   if (!achievement) return;
+
+  //   // Check BEFORE state update to show alerts
+  //   const student = students.find((s) => s.id === studentId);
+  //   if (!student) return;
+
+  //   if (
+  //     achievement.type === "lifetime" &&
+  //     student.achievements?.includes(achievementId)
+  //   ) {
+  //     alert(`${student.name} already earned "${achievement.name}"!`);
+  //     return;
+  //   }
+
+  //   if (achievement.type === "session") {
+  //     const currentSessionAchievements =
+  //       student.sessionAchievements?.[currentSession] || [];
+  //     if (currentSessionAchievements.includes(achievementId)) {
+  //       alert(
+  //         `${student.name} already earned "${achievement.name}" this session!`
+  //       );
+  //       return;
+  //     }
+  //   }
+
+  //   // Now do the state update
+  //   setStudents((prev) => {
+  //     return prev.map((s) => {
+  //       if (s.id !== studentId) return s;
+
+  //       const updatedStudent = { ...s };
+
+  //       if (achievement.type === "lifetime") {
+  //         // Check again to be idempotent
+  //         if (!s.achievements?.includes(achievementId)) {
+  //           updatedStudent.achievements = [
+  //             ...(s.achievements || []),
+  //             achievementId,
+  //           ];
+  //           updatedStudent.lifetimeXP = (s.lifetimeXP || 0) + achievement.xp;
+  //         }
+  //       } else {
+  //         // Session achievement
+  //         const existingAchievements =
+  //           s.sessionAchievements?.[currentSession] || [];
+
+  //         if (!existingAchievements.includes(achievementId)) {
+  //           // Initialize if needed
+  //           if (!updatedStudent.sessionAchievements) {
+  //             updatedStudent.sessionAchievements = {};
+  //           }
+  //           updatedStudent.sessionAchievements[currentSession] = [
+  //             ...existingAchievements,
+  //             achievementId,
+  //           ];
+
+  //           if (!updatedStudent.sessionXP) {
+  //             updatedStudent.sessionXP = {};
+  //           }
+  //           updatedStudent.sessionXP[currentSession] =
+  //             (s.sessionXP?.[currentSession] || 0) + achievement.xp;
+
+  //           // Lifetime XP
+  //           const lifetimeContribution = Math.floor(achievement.xp * 0.3);
+  //           updatedStudent.lifetimeXP =
+  //             (s.lifetimeXP || 0) + lifetimeContribution;
+  //         }
+  //       }
+
+  //       return updatedStudent;
+  //     });
+  //   });
+  // };
+
+  // Award achievement - SIMPLE FINAL VERSION
   const awardAchievement = (studentId, achievementId) => {
     const achievement = achievements.find((a) => a.id === achievementId);
     if (!achievement) return;
 
-    // First, check if already earned BEFORE updating state
+    // Check BEFORE state update to show alerts
     const student = students.find((s) => s.id === studentId);
     if (!student) return;
 
-    // Check if already earned
     if (
       achievement.type === "lifetime" &&
       student.achievements?.includes(achievementId)
@@ -422,70 +500,66 @@ const VEXLifetimeAchievementSystem = () => {
       return;
     }
 
-    const currentSessionAchievements =
-      student.sessionAchievements?.[currentSession] || [];
-    if (
-      achievement.type === "session" &&
-      currentSessionAchievements.includes(achievementId)
-    ) {
-      alert(
-        `${student.name} already earned "${achievement.name}" this session!`
-      );
-      return;
+    if (achievement.type === "session") {
+      const currentSessionAchievements =
+        student.sessionAchievements?.[currentSession] || [];
+      if (currentSessionAchievements.includes(achievementId)) {
+        alert(
+          `${student.name} already earned "${achievement.name}" this session!`
+        );
+        return;
+      }
     }
 
-    // Now proceed with the update
-    setStudents((prev) =>
-      prev.map((s) => {
-        if (s.id === studentId) {
-          const newStudent = { ...s };
+    // Now do the state update - using functional update to ensure we always get latest state
+    setStudents((prev) => {
+      // Find the most current version of the student
+      const currentStudent = prev.find((s) => s.id === studentId);
+      if (!currentStudent) return prev;
 
-          if (achievement.type === "lifetime") {
-            // Lifetime achievement
-            newStudent.achievements = [
-              ...(s.achievements || []),
-              achievementId,
-            ];
-            newStudent.lifetimeXP = (s.lifetimeXP || 0) + achievement.xp;
-          } else {
-            // Session achievement
-            if (!newStudent.sessionAchievements) {
-              newStudent.sessionAchievements = {};
-            }
-            if (!newStudent.sessionAchievements[currentSession]) {
-              newStudent.sessionAchievements[currentSession] = [];
-            }
-
-            // Idempotent update - check before adding
-            const existingAchievements =
-              s.sessionAchievements?.[currentSession] || [];
-            if (!existingAchievements.includes(achievementId)) {
-              newStudent.sessionAchievements[currentSession] = [
-                ...existingAchievements,
-                achievementId,
-              ];
-            } else {
-              newStudent.sessionAchievements[currentSession] =
-                existingAchievements;
-            }
-
-            // Award session XP
-            if (!newStudent.sessionXP) {
-              newStudent.sessionXP = {};
-            }
-            newStudent.sessionXP[currentSession] =
-              (newStudent.sessionXP[currentSession] || 0) + achievement.xp;
-
-            // 30% to lifetime
-            const lifetimeContribution = Math.floor(achievement.xp * 0.3);
-            newStudent.lifetimeXP = (s.lifetimeXP || 0) + lifetimeContribution;
-          }
-
-          return newStudent;
+      // Check again with the most current data
+      if (achievement.type === "session") {
+        const currentAchievements =
+          currentStudent.sessionAchievements?.[currentSession] || [];
+        if (currentAchievements.includes(achievementId)) {
+          // Already has it in the current state, no update needed
+          return prev;
         }
-        return s;
-      })
-    );
+      }
+
+      // Now we definitely need to add it
+      return prev.map((s) => {
+        if (s.id !== studentId) return s;
+
+        if (achievement.type === "lifetime") {
+          return {
+            ...s,
+            achievements: [...(s.achievements || []), achievementId],
+            lifetimeXP: (s.lifetimeXP || 0) + achievement.xp,
+          };
+        } else {
+          // Session achievement - do everything in one shot
+          const updatedStudent = {
+            ...s,
+            sessionAchievements: {
+              ...s.sessionAchievements,
+              [currentSession]: [
+                ...(s.sessionAchievements?.[currentSession] || []),
+                achievementId,
+              ],
+            },
+            sessionXP: {
+              ...s.sessionXP,
+              [currentSession]:
+                (s.sessionXP?.[currentSession] || 0) + achievement.xp,
+            },
+            lifetimeXP: (s.lifetimeXP || 0) + Math.floor(achievement.xp * 0.3),
+          };
+
+          return updatedStudent;
+        }
+      });
+    });
   };
 
   // Get how many times an achievement was earned across all sessions
@@ -1831,6 +1905,332 @@ const VEXLifetimeAchievementSystem = () => {
     </div>
   );
 
+  const BulkAchievementAward = () => {
+    const [selectedAchievement, setSelectedAchievement] = useState("");
+    const [awardSuccess, setAwardSuccess] = useState(false);
+    const [awardResults, setAwardResults] = useState({
+      success: 0,
+      skipped: 0,
+    });
+
+    const sessionCategory = getSessionCategory(currentSession);
+    const availableAchievements = achievements.filter(
+      (a) => a.type === "session" && a.category === sessionCategory
+    );
+
+    const lifetimeAchievements = achievements.filter(
+      (a) => a.type === "lifetime"
+    );
+
+    const handleBulkAward = () => {
+      if (!selectedAchievement || bulkSelectedStudents.length === 0) return;
+
+      const achievement = achievements.find(
+        (a) => a.id === parseInt(selectedAchievement)
+      );
+      if (!achievement) return;
+
+      let successCount = 0;
+      let skippedCount = 0;
+
+      // Award to all selected students
+      bulkSelectedStudents.forEach((studentId) => {
+        const student = students.find((s) => s.id === studentId);
+        if (!student) return;
+
+        // Check if already earned
+        let alreadyEarned = false;
+        if (achievement.type === "lifetime") {
+          alreadyEarned = student.achievements?.includes(achievement.id);
+        } else {
+          const sessionAchievements =
+            student.sessionAchievements?.[currentSession] || [];
+          alreadyEarned = sessionAchievements.includes(achievement.id);
+        }
+
+        if (!alreadyEarned) {
+          awardAchievement(studentId, achievement.id);
+          successCount++;
+        } else {
+          skippedCount++;
+        }
+      });
+
+      // Show results
+      setAwardResults({ success: successCount, skipped: skippedCount });
+      setAwardSuccess(true);
+
+      // Only close if at least one was successful
+      if (successCount > 0) {
+        setTimeout(() => {
+          setAwardSuccess(false);
+          setShowBulkAward(false);
+          setBulkSelectedStudents([]);
+          setSelectedAchievement("");
+          setAwardResults({ success: 0, skipped: 0 });
+        }, 3000);
+      } else {
+        // If all were skipped, just reset the success message
+        setTimeout(() => {
+          setAwardSuccess(false);
+          setAwardResults({ success: 0, skipped: 0 });
+        }, 3000);
+      }
+    };
+
+    const toggleStudent = (studentId) => {
+      if (bulkSelectedStudents.includes(studentId)) {
+        setBulkSelectedStudents(
+          bulkSelectedStudents.filter((id) => id !== studentId)
+        );
+      } else {
+        setBulkSelectedStudents([...bulkSelectedStudents, studentId]);
+      }
+    };
+
+    const selectAll = () => {
+      setBulkSelectedStudents(students.map((s) => s.id));
+    };
+
+    const selectNone = () => {
+      setBulkSelectedStudents([]);
+    };
+
+    // Preview which students already have the selected achievement
+    const getStudentAchievementStatus = (studentId) => {
+      if (!selectedAchievement)
+        return { hasAchievement: false, earnedCount: 0 };
+
+      const student = students.find((s) => s.id === studentId);
+      const achievement = achievements.find(
+        (a) => a.id === parseInt(selectedAchievement)
+      );
+
+      if (!student || !achievement)
+        return { hasAchievement: false, earnedCount: 0 };
+
+      if (achievement.type === "lifetime") {
+        return {
+          hasAchievement:
+            student.achievements?.includes(achievement.id) || false,
+          earnedCount: 0,
+        };
+      } else {
+        const currentSessionAchievements =
+          student.sessionAchievements?.[currentSession] || [];
+        const hasInCurrentSession = currentSessionAchievements.includes(
+          achievement.id
+        );
+        const earnedCount = getAchievementEarnCount(student, achievement.id);
+
+        return {
+          hasAchievement: hasInCurrentSession,
+          earnedCount: earnedCount,
+        };
+      }
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold">🏅 Bulk Achievement Award</h2>
+            <button
+              onClick={() => {
+                setShowBulkAward(false);
+                setBulkSelectedStudents([]);
+                setSelectedAchievement("");
+                setAwardSuccess(false);
+                setAwardResults({ success: 0, skipped: 0 });
+              }}
+              className="text-2xl hover:text-gray-600"
+            >
+              ×
+            </button>
+          </div>
+
+          {awardSuccess && (
+            <div
+              className={`mb-4 p-4 rounded-lg ${
+                awardResults.success > 0
+                  ? "bg-green-100 border border-green-300"
+                  : "bg-yellow-100 border border-yellow-300"
+              }`}
+            >
+              <p
+                className={`font-semibold text-center ${
+                  awardResults.success > 0
+                    ? "text-green-800"
+                    : "text-yellow-800"
+                }`}
+              >
+                {awardResults.success > 0 &&
+                  `✅ Achievement awarded to ${awardResults.success} student${
+                    awardResults.success !== 1 ? "s" : ""
+                  }!`}
+                {awardResults.success > 0 && awardResults.skipped > 0 && " "}
+                {awardResults.skipped > 0 &&
+                  `⚠️ ${awardResults.skipped} student${
+                    awardResults.skipped !== 1 ? "s" : ""
+                  } already had this achievement.`}
+                {awardResults.success === 0 &&
+                  awardResults.skipped > 0 &&
+                  "⚠️ All selected students already have this achievement!"}
+              </p>
+            </div>
+          )}
+
+          {/* Step 1: Select Students */}
+          <div className="mb-6">
+            <h3 className="text-lg font-bold mb-3">Step 1: Select Students</h3>
+            <div className="flex gap-2 mb-3">
+              <button
+                onClick={selectAll}
+                className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm"
+              >
+                Select All
+              </button>
+              <button
+                onClick={selectNone}
+                className="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm"
+              >
+                Select None
+              </button>
+              <span className="ml-auto text-sm text-gray-600">
+                {bulkSelectedStudents.length} selected
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-48 overflow-y-auto p-2 bg-gray-50 rounded">
+              {students.map((student) => {
+                const { hasAchievement, earnedCount } =
+                  getStudentAchievementStatus(student.id);
+                const isSelected = bulkSelectedStudents.includes(student.id);
+
+                return (
+                  <label
+                    key={student.id}
+                    className={`flex items-center p-2 rounded border cursor-pointer transition-colors relative ${
+                      isSelected
+                        ? "bg-blue-100 border-blue-300"
+                        : "bg-white border-gray-200 hover:bg-gray-50"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleStudent(student.id)}
+                      className="mr-2"
+                    />
+                    <span className="flex items-center gap-2 flex-1">
+                      <span className="text-xl">{student.avatar}</span>
+                      <span className={isSelected ? "font-semibold" : ""}>
+                        {student.name}
+                      </span>
+                    </span>
+                    {selectedAchievement && hasAchievement && (
+                      <span className="text-xs bg-yellow-200 text-yellow-800 px-2 py-1 rounded ml-2">
+                        Has it
+                      </span>
+                    )}
+                    {selectedAchievement &&
+                      !hasAchievement &&
+                      earnedCount > 0 && (
+                        <span className="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded ml-2">
+                          {earnedCount}x
+                        </span>
+                      )}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Step 2: Select Achievement */}
+          <div className="mb-6">
+            <h3 className="text-lg font-bold mb-3">
+              Step 2: Select Achievement
+            </h3>
+
+            <select
+              value={selectedAchievement}
+              onChange={(e) => setSelectedAchievement(e.target.value)}
+              className="w-full p-3 border rounded"
+            >
+              <option value="">Select an achievement...</option>
+              <optgroup label="Session Achievements">
+                {availableAchievements.map((achievement) => (
+                  <option key={achievement.id} value={achievement.id}>
+                    {achievement.icon} {achievement.name} ({achievement.xp} XP)
+                    - {achievement.description}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Lifetime Achievements">
+                {lifetimeAchievements.map((achievement) => (
+                  <option key={achievement.id} value={achievement.id}>
+                    {achievement.icon} {achievement.name} ({achievement.xp} XP)
+                    - {achievement.description}
+                  </option>
+                ))}
+              </optgroup>
+            </select>
+
+            {selectedAchievement && (
+              <div className="mt-3 p-3 bg-blue-50 rounded">
+                <p className="text-sm text-blue-800">
+                  <strong>Preview:</strong>
+                  {(() => {
+                    const willReceive = bulkSelectedStudents.filter(
+                      (id) => !getStudentAchievementStatus(id).hasAchievement
+                    ).length;
+                    const alreadyHave =
+                      bulkSelectedStudents.length - willReceive;
+
+                    return (
+                      <span>
+                        {" "}
+                        {willReceive} student{willReceive !== 1 ? "s" : ""} will
+                        receive this achievement
+                        {alreadyHave > 0 && `, ${alreadyHave} already have it`}.
+                      </span>
+                    );
+                  })()}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Award Button */}
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => {
+                setShowBulkAward(false);
+                setBulkSelectedStudents([]);
+                setSelectedAchievement("");
+                setAwardSuccess(false);
+                setAwardResults({ success: 0, skipped: 0 });
+              }}
+              className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleBulkAward}
+              disabled={
+                !selectedAchievement || bulkSelectedStudents.length === 0
+              }
+              className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:bg-gray-300 font-semibold"
+            >
+              Award to {bulkSelectedStudents.length} Student
+              {bulkSelectedStudents.length !== 1 ? "s" : ""}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Student Card Component
   const StudentCard = ({ student }) => {
     const lifetimeLevel = getStudentLevel(student.lifetimeXP || 0);
@@ -2335,6 +2735,12 @@ const VEXLifetimeAchievementSystem = () => {
               🏅 Manage Achievements
             </button>
             <button
+              onClick={() => setShowBulkAward(true)}
+              className="px-3 py-1 bg-purple-600 rounded hover:bg-purple-700 text-white"
+            >
+              🏅 Bulk Award
+            </button>
+            <button
               onClick={exportData}
               className="px-3 py-1 bg-green-600 rounded hover:bg-green-700"
             >
@@ -2344,7 +2750,6 @@ const VEXLifetimeAchievementSystem = () => {
           </div>
         </div>
       </div>
-
       <div className="max-w-7xl mx-auto p-6">
         {currentView === "dashboard" ? (
           <div>
@@ -2451,10 +2856,10 @@ const VEXLifetimeAchievementSystem = () => {
           </div>
         )}
       </div>
-
       {selectedStudent && <StudentDetail />}
       {showStudentManager && <StudentManager />}
       {showAchievementManager && <AchievementManager />}
+      {showBulkAward && <BulkAchievementAward />}
       {showTeamManager && (
         <TeamManager
           students={students}
