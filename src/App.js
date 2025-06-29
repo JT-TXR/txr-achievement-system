@@ -3280,6 +3280,7 @@ const VEXLifetimeAchievementSystem = () => {
         )}
       </div>
       {selectedStudent && <StudentDetail />}
+      {showSessionManager && <SessionManager />}
       {showStudentManager && <StudentManager />}
       {showAchievementManager && <AchievementManager />}
       {showBulkAward && <BulkAchievementAward />}
