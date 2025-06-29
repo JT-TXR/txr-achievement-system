@@ -347,10 +347,14 @@ const VEXLifetimeAchievementSystem = () => {
 
   // Determine session category
   // TODO: Make categories customizable in future version
-  const getSessionCategory = (sessionName) => {
-    // Handle both string session names and session objects
-    const name =
-      typeof sessionName === "string" ? sessionName : sessionName.name;
+  const getSessionCategory = (session) => {
+    // If we have a session object with a type, use it
+    if (session && typeof session === "object" && session.type) {
+      return session.type;
+    }
+
+    // Fallback to name-based detection for backward compatibility
+    const name = typeof session === "string" ? session : session?.name || "";
 
     if (name.includes("Summer")) return "summer";
     if (name.includes("GO")) return "school-go";
@@ -359,10 +363,15 @@ const VEXLifetimeAchievementSystem = () => {
     return "general";
   };
 
+  // Get current session object
+  const getCurrentSessionObject = () => {
+    return sessions.find((s) => s.name === currentSession) || null;
+  };
+
   // Get available achievements for current session - WITH DEBUG
   const getAvailableSessionAchievements = (student) => {
     const earnedInSession = student.sessionAchievements?.[currentSession] || [];
-    const sessionCategory = getSessionCategory(currentSession);
+    const sessionCategory = getSessionCategory(getCurrentSessionObject());
 
     const available = achievements.filter(
       (a) =>
@@ -1928,7 +1937,7 @@ const VEXLifetimeAchievementSystem = () => {
       skipped: 0,
     });
 
-    const sessionCategory = getSessionCategory(currentSession);
+    const sessionCategory = getSessionCategory(getCurrentSessionObject());
     const availableAchievements = achievements.filter(
       (a) => a.type === "session" && a.category === sessionCategory
     );
@@ -2271,8 +2280,12 @@ const VEXLifetimeAchievementSystem = () => {
         id: `session_${Date.now()}`,
         name: newSession.name,
         type: newSession.type,
-        startDate: newSession.startDate || null,
-        endDate: newSession.endDate || null,
+        startDate: newSession.startDate
+          ? new Date(newSession.startDate + "T00:00:00").toISOString()
+          : null,
+        endDate: newSession.endDate
+          ? new Date(newSession.endDate + "T00:00:00").toISOString()
+          : null,
         isActive: true,
         order: sessions.length,
         createdAt: new Date().toISOString(),
@@ -2567,8 +2580,8 @@ const VEXLifetimeAchievementSystem = () => {
                               <span className="ml-2">
                                 {new Date(
                                   session.startDate
-                                ).toLocaleDateString()}{" "}
-                                -
+                                ).toLocaleDateString()}
+                                {""}-
                                 {session.endDate
                                   ? new Date(
                                       session.endDate
@@ -2977,7 +2990,7 @@ const VEXLifetimeAchievementSystem = () => {
                 .filter(
                   (a) =>
                     a.type === "session" &&
-                    getSessionCategory(currentSession) === a.category
+                    getSessionCategory(getCurrentSessionObject()) === a.category
                 )
                 .map((achievement) => {
                   const currentSessionAchievements =
