@@ -193,19 +193,59 @@ const VEXLifetimeAchievementSystem = () => {
     },
   ]);
 
-  const [currentSession, setCurrentSession] = useState("Summer 2025 - Week 3");
-  const [sessions, setSessions] = useState([
-    "Summer 2025 - Week 1",
-    "Summer 2025 - Week 2",
-    "Summer 2025 - Week 3",
-    "Summer 2025 - Week 4",
-    "Summer 2025 - Week 5",
-    "Summer 2025 - Week 6",
-    "Summer 2025 - Week 7",
-    "Fall 2025 - VEX GO",
-    "Fall 2025 - VEX IQ",
-    "Fall 2025 - Competition Team",
-  ]);
+  // Session Management - Enhanced structure
+  const [currentSession, setCurrentSession] = useState("Summer 2024 - Week 3");
+  const [sessions, setSessions] = useState([]);
+  const [showSessionManager, setShowSessionManager] = useState(false);
+
+  // Helper to migrate old string sessions to new format
+  const migrateSessionsToNewFormat = (oldSessions) => {
+    if (oldSessions.length === 0) return [];
+
+    // Check if already migrated (first item is an object)
+    if (typeof oldSessions[0] === "object") return oldSessions;
+
+    // Migration map for existing sessions
+    const sessionTypeMap = {
+      Summer: "summer",
+      Fall: "school",
+      Spring: "school",
+      Competition: "competition",
+    };
+
+    return oldSessions.map((sessionName, index) => {
+      let type = "general";
+      for (const [key, value] of Object.entries(sessionTypeMap)) {
+        if (sessionName.includes(key)) {
+          type = value;
+          break;
+        }
+      }
+
+      // Guess dates based on session names
+      let startDate = null;
+      let endDate = null;
+      if (sessionName.includes("Summer 2024")) {
+        const weekMatch = sessionName.match(/Week (\d+)/);
+        if (weekMatch) {
+          const weekNum = parseInt(weekMatch[1]);
+          startDate = new Date(2024, 5, 3 + (weekNum - 1) * 7).toISOString(); // June 3 + weeks
+          endDate = new Date(2024, 5, 7 + (weekNum - 1) * 7).toISOString(); // 5 days later
+        }
+      }
+
+      return {
+        id: `session_${Date.now()}_${index}`,
+        name: sessionName,
+        type,
+        startDate,
+        endDate,
+        isActive: true,
+        order: index,
+        createdAt: new Date().toISOString(),
+      };
+    });
+  };
 
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [currentView, setCurrentView] = useState("dashboard");
