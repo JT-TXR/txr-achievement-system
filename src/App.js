@@ -3104,11 +3104,14 @@ const VEXLifetimeAchievementSystem = () => {
                 onChange={(e) => setCurrentSession(e.target.value)}
                 className="px-3 py-2 rounded bg-blue-700 text-white"
               >
-                {sessions.map((session) => (
-                  <option key={session} value={session}>
-                    {session}
-                  </option>
-                ))}
+                {sessions
+                  .filter((s) => s.isActive)
+                  .sort((a, b) => a.order - b.order)
+                  .map((session) => (
+                    <option key={session.id} value={session.name}>
+                      {session.name}
+                    </option>
+                  ))}
               </select>
               <div className="flex gap-2">
                 <button
@@ -3136,6 +3139,12 @@ const VEXLifetimeAchievementSystem = () => {
           </div>
 
           <div className="flex gap-2 mt-3 flex-wrap">
+            <button
+              onClick={() => setShowSessionManager(true)}
+              className="px-3 py-1 bg-blue-700 rounded hover:bg-blue-800"
+            >
+              📅 Manage Sessions
+            </button>
             <button
               onClick={() => setShowStudentManager(true)}
               className="px-3 py-1 bg-blue-700 rounded hover:bg-blue-800"
