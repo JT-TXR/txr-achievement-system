@@ -470,7 +470,13 @@ const VEXLifetimeAchievementSystem = () => {
               newStudent.sessionAchievements[currentSession] =
                 existingAchievements;
             }
-
+            console.log("Before award:", {
+              studentName: s.name,
+              achievementName: achievement.name,
+              achievementXP: achievement.xp,
+              currentSessionXP: newStudent.sessionXP[currentSession] || 0,
+              currentLifetimeXP: s.lifetimeXP || 0,
+            });
             // Award session XP
             if (!newStudent.sessionXP) {
               newStudent.sessionXP = {};
@@ -481,6 +487,11 @@ const VEXLifetimeAchievementSystem = () => {
             // 30% to lifetime
             const lifetimeContribution = Math.floor(achievement.xp * 0.3);
             newStudent.lifetimeXP = (s.lifetimeXP || 0) + lifetimeContribution;
+
+            console.log("After award:", {
+              newSessionXP: newStudent.sessionXP[currentSession],
+              newLifetimeXP: newStudent.lifetimeXP,
+            });
           }
 
           return newStudent;
