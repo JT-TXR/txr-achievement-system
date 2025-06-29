@@ -2246,6 +2246,405 @@ const VEXLifetimeAchievementSystem = () => {
     );
   };
 
+  // Session Manager Modal
+  const SessionManager = () => {
+    const [newSession, setNewSession] = useState({
+      name: "",
+      type: "general",
+      startDate: "",
+      endDate: "",
+    });
+    const [editingSession, setEditingSession] = useState(null);
+    const [showArchived, setShowArchived] = useState(false);
+
+    const activeSessions = sessions
+      .filter((s) => s.isActive)
+      .sort((a, b) => a.order - b.order);
+    const archivedSessions = sessions
+      .filter((s) => !s.isActive)
+      .sort((a, b) => a.order - b.order);
+
+    const addSession = () => {
+      if (!newSession.name) return;
+
+      const session = {
+        id: `session_${Date.now()}`,
+        name: newSession.name,
+        type: newSession.type,
+        startDate: newSession.startDate || null,
+        endDate: newSession.endDate || null,
+        isActive: true,
+        order: sessions.length,
+        createdAt: new Date().toISOString(),
+      };
+
+      setSessions([...sessions, session]);
+
+      // Reset form
+      setNewSession({
+        name: "",
+        type: "general",
+        startDate: "",
+        endDate: "",
+      });
+    };
+
+    const updateSession = (sessionId, updates) => {
+      setSessions(
+        sessions.map((s) => (s.id === sessionId ? { ...s, ...updates } : s))
+      );
+
+      // Update currentSession if the name changed
+      if (
+        updates.name &&
+        currentSession === sessions.find((s) => s.id === sessionId)?.name
+      ) {
+        setCurrentSession(updates.name);
+      }
+
+      setEditingSession(null);
+    };
+
+    const archiveSession = (sessionId) => {
+      const session = sessions.find((s) => s.id === sessionId);
+      if (session && session.name === currentSession) {
+        alert(
+          "Cannot archive the current session. Please switch to another session first."
+        );
+        return;
+      }
+
+      setSessions(
+        sessions.map((s) =>
+          s.id === sessionId ? { ...s, isActive: false } : s
+        )
+      );
+    };
+
+    const unarchiveSession = (sessionId) => {
+      setSessions(
+        sessions.map((s) => (s.id === sessionId ? { ...s, isActive: true } : s))
+      );
+    };
+
+    const moveSession = (sessionId, direction) => {
+      const sessionList = showArchived ? archivedSessions : activeSessions;
+      const index = sessionList.findIndex((s) => s.id === sessionId);
+      if (
+        (direction === "up" && index === 0) ||
+        (direction === "down" && index === sessionList.length - 1)
+      )
+        return;
+
+      const newOrder = direction === "up" ? index - 1 : index + 1;
+      const otherSession = sessionList[newOrder];
+
+      setSessions(
+        sessions.map((s) => {
+          if (s.id === sessionId) return { ...s, order: otherSession.order };
+          if (s.id === otherSession.id)
+            return { ...s, order: sessionList[index].order };
+          return s;
+        })
+      );
+    };
+
+    const sessionTypeInfo = {
+      summer: {
+        label: "Summer Camp",
+        color: "bg-yellow-100 text-yellow-800",
+        icon: "☀️",
+      },
+      "school-go": {
+        label: "School - VEX GO",
+        color: "bg-green-100 text-green-800",
+        icon: "🟢",
+      },
+      "school-iq": {
+        label: "School - VEX IQ",
+        color: "bg-blue-100 text-blue-800",
+        icon: "🔵",
+      },
+      competition: {
+        label: "Competition",
+        color: "bg-purple-100 text-purple-800",
+        icon: "🏆",
+      },
+      general: {
+        label: "General",
+        color: "bg-gray-100 text-gray-800",
+        icon: "📅",
+      },
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold">📅 Manage Sessions</h2>
+            <button
+              onClick={() => setShowSessionManager(false)}
+              className="text-2xl hover:text-gray-600"
+            >
+              ×
+            </button>
+          </div>
+
+          {/* Add New Session */}
+          <div className="mb-6 p-4 bg-green-50 rounded-lg">
+            <h3 className="font-bold mb-3">Add New Session</h3>
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <input
+                type="text"
+                placeholder="Session Name"
+                value={newSession.name}
+                onChange={(e) =>
+                  setNewSession({ ...newSession, name: e.target.value })
+                }
+                className="px-3 py-2 border rounded"
+              />
+              <select
+                value={newSession.type}
+                onChange={(e) =>
+                  setNewSession({ ...newSession, type: e.target.value })
+                }
+                className="px-3 py-2 border rounded"
+              >
+                <option value="general">General</option>
+                <option value="summer">Summer Camp</option>
+                <option value="school-go">School - VEX GO</option>
+                <option value="school-iq">School - VEX IQ</option>
+                <option value="competition">Competition</option>
+              </select>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="text-sm text-gray-600">
+                  Start Date (optional)
+                </label>
+                <input
+                  type="date"
+                  value={newSession.startDate}
+                  onChange={(e) =>
+                    setNewSession({ ...newSession, startDate: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border rounded"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-gray-600">
+                  End Date (optional)
+                </label>
+                <input
+                  type="date"
+                  value={newSession.endDate}
+                  onChange={(e) =>
+                    setNewSession({ ...newSession, endDate: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border rounded"
+                />
+              </div>
+              <div className="flex items-end">
+                <button
+                  onClick={addSession}
+                  disabled={!newSession.name}
+                  className="w-full px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:bg-gray-300"
+                >
+                  Add Session
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Active Sessions */}
+          <div className="mb-6">
+            <h3 className="font-bold mb-3">
+              Active Sessions ({activeSessions.length})
+            </h3>
+            {activeSessions.length === 0 ? (
+              <p className="text-gray-500 italic">
+                No active sessions. Add one above!
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {activeSessions.map((session, index) => (
+                  <div
+                    key={session.id}
+                    className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
+                  >
+                    {editingSession === session.id ? (
+                      <div className="flex-1 flex gap-2">
+                        <input
+                          type="text"
+                          value={session.name}
+                          onChange={(e) =>
+                            setSessions(
+                              sessions.map((s) =>
+                                s.id === session.id
+                                  ? { ...s, name: e.target.value }
+                                  : s
+                              )
+                            )
+                          }
+                          className="flex-1 px-2 py-1 border rounded"
+                          autoFocus
+                        />
+                        <select
+                          value={session.type}
+                          onChange={(e) =>
+                            setSessions(
+                              sessions.map((s) =>
+                                s.id === session.id
+                                  ? { ...s, type: e.target.value }
+                                  : s
+                              )
+                            )
+                          }
+                          className="px-2 py-1 border rounded"
+                        >
+                          <option value="general">General</option>
+                          <option value="summer">Summer</option>
+                          <option value="school-go">VEX GO</option>
+                          <option value="school-iq">VEX IQ</option>
+                          <option value="competition">Competition</option>
+                        </select>
+                        <button
+                          onClick={() => {
+                            const sessionToUpdate = sessions.find(
+                              (s) => s.id === session.id
+                            );
+                            updateSession(session.id, {
+                              name: sessionToUpdate.name,
+                              type: sessionToUpdate.type,
+                            });
+                          }}
+                          className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
+                        >
+                          Save
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => moveSession(session.id, "up")}
+                            disabled={index === 0}
+                            className="text-gray-400 hover:text-gray-600 disabled:opacity-30"
+                          >
+                            ↑
+                          </button>
+                          <button
+                            onClick={() => moveSession(session.id, "down")}
+                            disabled={index === activeSessions.length - 1}
+                            className="text-gray-400 hover:text-gray-600 disabled:opacity-30"
+                          >
+                            ↓
+                          </button>
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">
+                              {sessionTypeInfo[session.type]?.icon}
+                            </span>
+                            <span className="font-semibold">
+                              {session.name}
+                            </span>
+                            {session.name === currentSession && (
+                              <span className="px-2 py-1 bg-blue-500 text-white text-xs rounded">
+                                Current
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-sm text-gray-600 mt-1">
+                            <span
+                              className={`px-2 py-1 rounded text-xs ${
+                                sessionTypeInfo[session.type]?.color
+                              }`}
+                            >
+                              {sessionTypeInfo[session.type]?.label}
+                            </span>
+                            {session.startDate && (
+                              <span className="ml-2">
+                                {new Date(
+                                  session.startDate
+                                ).toLocaleDateString()}{" "}
+                                -
+                                {session.endDate
+                                  ? new Date(
+                                      session.endDate
+                                    ).toLocaleDateString()
+                                  : "Ongoing"}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setEditingSession(session.id)}
+                            className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => archiveSession(session.id)}
+                            className="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600"
+                          >
+                            Archive
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Archived Sessions */}
+          {archivedSessions.length > 0 && (
+            <div>
+              <button
+                onClick={() => setShowArchived(!showArchived)}
+                className="flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-3"
+              >
+                <span>{showArchived ? "▼" : "▶"}</span>
+                <span className="font-semibold">
+                  Archived Sessions ({archivedSessions.length})
+                </span>
+              </button>
+
+              {showArchived && (
+                <div className="space-y-2">
+                  {archivedSessions.map((session) => (
+                    <div
+                      key={session.id}
+                      className="flex items-center gap-3 p-3 bg-gray-100 rounded-lg opacity-75"
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">
+                            {sessionTypeInfo[session.type]?.icon}
+                          </span>
+                          <span className="font-semibold">{session.name}</span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => unarchiveSession(session.id)}
+                        className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
+                      >
+                        Restore
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   // Student Card Component
   const StudentCard = ({ student }) => {
     const lifetimeLevel = getStudentLevel(student.lifetimeXP || 0);
