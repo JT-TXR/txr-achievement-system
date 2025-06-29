@@ -213,6 +213,8 @@ const VEXLifetimeAchievementSystem = () => {
   const [showAchievementManager, setShowAchievementManager] = useState(false);
   const [xpToAward, setXpToAward] = useState(10);
   const [filterProgram, setFilterProgram] = useState("ALL");
+  const [showBulkAward, setShowBulkAward] = useState(false);
+  const [bulkSelectedStudents, setBulkSelectedStudents] = useState([]);
 
   // Tournament Management States
   const [teams, setTeams] = useState([]);
@@ -1831,6 +1833,203 @@ const VEXLifetimeAchievementSystem = () => {
     </div>
   );
 
+  const BulkAchievementAward = () => {
+    const [selectedAchievement, setSelectedAchievement] = useState("");
+    const [awardSuccess, setAwardSuccess] = useState(false);
+
+    const sessionCategory = getSessionCategory(currentSession);
+    const availableAchievements = achievements.filter(
+      (a) => a.type === "session" && a.category === sessionCategory
+    );
+
+    const lifetimeAchievements = achievements.filter(
+      (a) => a.type === "lifetime"
+    );
+
+    const handleBulkAward = () => {
+      if (!selectedAchievement || bulkSelectedStudents.length === 0) return;
+
+      // Award to all selected students
+      bulkSelectedStudents.forEach((studentId) => {
+        awardAchievement(studentId, parseInt(selectedAchievement));
+      });
+
+      // Show success message
+      setAwardSuccess(true);
+      setTimeout(() => {
+        setAwardSuccess(false);
+        setShowBulkAward(false);
+        setBulkSelectedStudents([]);
+        setSelectedAchievement("");
+      }, 2000);
+    };
+
+    const toggleStudent = (studentId) => {
+      if (bulkSelectedStudents.includes(studentId)) {
+        setBulkSelectedStudents(
+          bulkSelectedStudents.filter((id) => id !== studentId)
+        );
+      } else {
+        setBulkSelectedStudents([...bulkSelectedStudents, studentId]);
+      }
+    };
+
+    const selectAll = () => {
+      setBulkSelectedStudents(students.map((s) => s.id));
+    };
+
+    const selectNone = () => {
+      setBulkSelectedStudents([]);
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold">🏅 Bulk Achievement Award</h2>
+            <button
+              onClick={() => {
+                setShowBulkAward(false);
+                setBulkSelectedStudents([]);
+                setSelectedAchievement("");
+              }}
+              className="text-2xl hover:text-gray-600"
+            >
+              ×
+            </button>
+          </div>
+
+          {awardSuccess && (
+            <div className="mb-4 p-4 bg-green-100 border border-green-300 rounded-lg">
+              <p className="text-green-800 font-semibold text-center">
+                ✅ Achievement awarded to {bulkSelectedStudents.length}{" "}
+                students!
+              </p>
+            </div>
+          )}
+
+          {/* Step 1: Select Students */}
+          <div className="mb-6">
+            <h3 className="text-lg font-bold mb-3">Step 1: Select Students</h3>
+            <div className="flex gap-2 mb-3">
+              <button
+                onClick={selectNone}
+                className="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm"
+              >
+                Select None
+              </button>
+              <span className="ml-auto text-sm text-gray-600">
+                {bulkSelectedStudents.length} selected
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-48 overflow-y-auto p-2 bg-gray-50 rounded">
+              {students.map((student) => (
+                <label
+                  key={student.id}
+                  className={`flex items-center p-2 rounded border cursor-pointer transition-colors ${
+                    bulkSelectedStudents.includes(student.id)
+                      ? "bg-blue-100 border-blue-300"
+                      : "bg-white border-gray-200 hover:bg-gray-50"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={bulkSelectedStudents.includes(student.id)}
+                    onChange={() => toggleStudent(student.id)}
+                    className="mr-2"
+                  />
+                  <span className="flex items-center gap-2">
+                    <span className="text-xl">{student.avatar}</span>
+                    <span
+                      className={
+                        bulkSelectedStudents.includes(student.id)
+                          ? "font-semibold"
+                          : ""
+                      }
+                    >
+                      {student.name}
+                    </span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Step 2: Select Achievement */}
+          <div className="mb-6">
+            <h3 className="text-lg font-bold mb-3">
+              Step 2: Select Achievement
+            </h3>
+
+            {/* Session Achievements */}
+            <div className="mb-4">
+              <h4 className="text-md font-semibold mb-2 text-gray-700">
+                {currentSession} Achievements
+              </h4>
+              <select
+                value={selectedAchievement}
+                onChange={(e) => setSelectedAchievement(e.target.value)}
+                className="w-full p-3 border rounded"
+              >
+                <option value="">Select an achievement...</option>
+                <optgroup label="Session Achievements">
+                  {availableAchievements.map((achievement) => (
+                    <option key={achievement.id} value={achievement.id}>
+                      {achievement.icon} {achievement.name} ({achievement.xp}{" "}
+                      XP) - {achievement.description}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Lifetime Achievements">
+                  {lifetimeAchievements.map((achievement) => (
+                    <option key={achievement.id} value={achievement.id}>
+                      {achievement.icon} {achievement.name} ({achievement.xp}{" "}
+                      XP) - {achievement.description}
+                    </option>
+                  ))}
+                </optgroup>
+              </select>
+            </div>
+
+            {selectedAchievement && (
+              <div className="p-3 bg-blue-50 rounded">
+                <p className="text-sm text-blue-800">
+                  <strong>Note:</strong> Students who already have this
+                  achievement will be skipped automatically.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Award Button */}
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => {
+                setShowBulkAward(false);
+                setBulkSelectedStudents([]);
+                setSelectedAchievement("");
+              }}
+              className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleBulkAward}
+              disabled={
+                !selectedAchievement || bulkSelectedStudents.length === 0
+              }
+              className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:bg-gray-300 font-semibold"
+            >
+              Award to {bulkSelectedStudents.length} Student
+              {bulkSelectedStudents.length !== 1 ? "s" : ""}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Student Card Component
   const StudentCard = ({ student }) => {
     const lifetimeLevel = getStudentLevel(student.lifetimeXP || 0);
@@ -2335,6 +2534,12 @@ const VEXLifetimeAchievementSystem = () => {
               🏅 Manage Achievements
             </button>
             <button
+              onClick={() => setShowBulkAward(true)}
+              className="px-3 py-1 bg-purple-600 rounded hover:bg-purple-700 text-white"
+            >
+              🏅 Bulk Award
+            </button>
+            <button
               onClick={exportData}
               className="px-3 py-1 bg-green-600 rounded hover:bg-green-700"
             >
@@ -2344,7 +2549,6 @@ const VEXLifetimeAchievementSystem = () => {
           </div>
         </div>
       </div>
-
       <div className="max-w-7xl mx-auto p-6">
         {currentView === "dashboard" ? (
           <div>
@@ -2451,10 +2655,10 @@ const VEXLifetimeAchievementSystem = () => {
           </div>
         )}
       </div>
-
       {selectedStudent && <StudentDetail />}
       {showStudentManager && <StudentManager />}
       {showAchievementManager && <AchievementManager />}
+      {showBulkAward && <BulkAchievementAward />}
       {showTeamManager && (
         <TeamManager
           students={students}
