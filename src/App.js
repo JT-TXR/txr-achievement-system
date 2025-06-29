@@ -406,7 +406,9 @@ const VEXLifetimeAchievementSystem = () => {
     );
   };
 
-  // Award achievement - FIXED VERSION
+  // Find your awardAchievement function and replace the session achievement part with this:
+
+  // Award achievement - FIXED VERSION (Idempotent)
   const awardAchievement = (studentId, achievementId) => {
     const achievement = achievements.find((a) => a.id === achievementId);
     if (!achievement) return;
@@ -458,40 +460,32 @@ const VEXLifetimeAchievementSystem = () => {
               newStudent.sessionAchievements[currentSession] = [];
             }
 
-            // Idempotent update - check before adding
-            const existingAchievements =
+            // Check again inside the map to ensure idempotency
+            const existingSessionAchievements =
               s.sessionAchievements?.[currentSession] || [];
-            if (!existingAchievements.includes(achievementId)) {
-              newStudent.sessionAchievements[currentSession] = [
-                ...existingAchievements,
-                achievementId,
-              ];
-            } else {
-              newStudent.sessionAchievements[currentSession] =
-                existingAchievements;
+            if (existingSessionAchievements.includes(achievementId)) {
+              // Already has it, return unchanged
+              return s;
             }
-            console.log("Before award:", {
-              studentName: s.name,
-              achievementName: achievement.name,
-              achievementXP: achievement.xp,
-              currentSessionXP: newStudent.sessionXP[currentSession] || 0,
-              currentLifetimeXP: s.lifetimeXP || 0,
-            });
-            // Award session XP
+
+            newStudent.sessionAchievements[currentSession] = [
+              ...existingSessionAchievements,
+              achievementId,
+            ];
+
+            // Award session XP - FIXED to use original student data, not newStudent
             if (!newStudent.sessionXP) {
               newStudent.sessionXP = {};
             }
-            newStudent.sessionXP[currentSession] =
-              (newStudent.sessionXP[currentSession] || 0) + achievement.xp;
 
-            // 30% to lifetime
+            // Use the ORIGINAL session XP from 's', not from 'newStudent'
+            const originalSessionXP = s.sessionXP?.[currentSession] || 0;
+            newStudent.sessionXP[currentSession] =
+              originalSessionXP + achievement.xp;
+
+            // 30% to lifetime - also based on ORIGINAL lifetime XP
             const lifetimeContribution = Math.floor(achievement.xp * 0.3);
             newStudent.lifetimeXP = (s.lifetimeXP || 0) + lifetimeContribution;
-
-            console.log("After award:", {
-              newSessionXP: newStudent.sessionXP[currentSession],
-              newLifetimeXP: newStudent.lifetimeXP,
-            });
           }
 
           return newStudent;
