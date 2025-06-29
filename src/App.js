@@ -193,8 +193,7 @@ const VEXLifetimeAchievementSystem = () => {
     },
   ]);
 
-  // Session Management - Enhanced structure
-  const [currentSession, setCurrentSession] = useState("Summer 2024 - Week 3");
+  const [currentSession, setCurrentSession] = useState("Summer 2025 - Week 3");
   const [sessions, setSessions] = useState([]);
   const [showSessionManager, setShowSessionManager] = useState(false);
 
@@ -205,41 +204,13 @@ const VEXLifetimeAchievementSystem = () => {
     // Check if already migrated (first item is an object)
     if (typeof oldSessions[0] === "object") return oldSessions;
 
-    // Migration map for existing sessions
-    const sessionTypeMap = {
-      Summer: "summer",
-      Fall: "school",
-      Spring: "school",
-      Competition: "competition",
-    };
-
     return oldSessions.map((sessionName, index) => {
-      let type = "general";
-      for (const [key, value] of Object.entries(sessionTypeMap)) {
-        if (sessionName.includes(key)) {
-          type = value;
-          break;
-        }
-      }
-
-      // Guess dates based on session names
-      let startDate = null;
-      let endDate = null;
-      if (sessionName.includes("Summer 2024")) {
-        const weekMatch = sessionName.match(/Week (\d+)/);
-        if (weekMatch) {
-          const weekNum = parseInt(weekMatch[1]);
-          startDate = new Date(2024, 5, 3 + (weekNum - 1) * 7).toISOString(); // June 3 + weeks
-          endDate = new Date(2024, 5, 7 + (weekNum - 1) * 7).toISOString(); // 5 days later
-        }
-      }
-
       return {
         id: `session_${Date.now()}_${index}`,
         name: sessionName,
-        type,
-        startDate,
-        endDate,
+        type: "general", // Default to general, let users set it
+        startDate: null, // Let users add dates
+        endDate: null, // Let users add dates
         isActive: true,
         order: index,
         createdAt: new Date().toISOString(),
