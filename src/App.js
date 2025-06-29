@@ -281,7 +281,10 @@ const VEXLifetimeAchievementSystem = () => {
 
     if (savedStudents) setStudents(JSON.parse(savedStudents));
     if (savedAchievements) setAchievements(JSON.parse(savedAchievements));
-    if (savedSessions) setSessions(JSON.parse(savedSessions));
+    if (savedSessions) {
+      const parsedSessions = JSON.parse(savedSessions);
+      setSessions(migrateSessionsToNewFormat(parsedSessions));
+    }
     if (savedCurrentSession) setCurrentSession(savedCurrentSession);
     if (savedMilestones) setStudentMilestones(JSON.parse(savedMilestones));
     if (savedTeams) setTeams(JSON.parse(savedTeams));
