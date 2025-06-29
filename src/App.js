@@ -694,6 +694,20 @@ const VEXLifetimeAchievementSystem = () => {
     const [newStudentName, setNewStudentName] = useState("");
     const [newStudentProgram, setNewStudentProgram] = useState("VEX IQ");
 
+    const handleAddStudent = () => {
+      if (newStudentName.trim()) {
+        addStudent(newStudentName.trim(), newStudentProgram);
+        setNewStudentName("");
+      }
+    };
+
+    const handleKeyPress = (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        handleAddStudent();
+      }
+    };
+
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
         <div className="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
@@ -712,10 +726,12 @@ const VEXLifetimeAchievementSystem = () => {
             <div className="flex gap-2">
               <input
                 type="text"
-                placeholder="Student Name"
+                placeholder="Student Name (press Enter to add)"
                 value={newStudentName}
                 onChange={(e) => setNewStudentName(e.target.value)}
+                onKeyPress={handleKeyPress}
                 className="flex-1 px-3 py-2 border rounded"
+                autoFocus
               />
               <select
                 value={newStudentProgram}
@@ -727,12 +743,7 @@ const VEXLifetimeAchievementSystem = () => {
                 <option value="Competition">Competition</option>
               </select>
               <button
-                onClick={() => {
-                  if (newStudentName) {
-                    addStudent(newStudentName, newStudentProgram);
-                    setNewStudentName("");
-                  }
-                }}
+                onClick={handleAddStudent}
                 className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
               >
                 Add Student
