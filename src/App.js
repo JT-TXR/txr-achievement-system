@@ -406,74 +406,158 @@ const VEXLifetimeAchievementSystem = () => {
     );
   };
 
-  // Award achievement - Stable version that works with React StrictMode
+  // // Award achievement - Simple idempotent version
+  // const awardAchievement = (studentId, achievementId) => {
+  //   const achievement = achievements.find((a) => a.id === achievementId);
+  //   if (!achievement) return;
+
+  //   // Check BEFORE state update to show alerts
+  //   const student = students.find((s) => s.id === studentId);
+  //   if (!student) return;
+
+  //   if (
+  //     achievement.type === "lifetime" &&
+  //     student.achievements?.includes(achievementId)
+  //   ) {
+  //     alert(`${student.name} already earned "${achievement.name}"!`);
+  //     return;
+  //   }
+
+  //   if (achievement.type === "session") {
+  //     const currentSessionAchievements =
+  //       student.sessionAchievements?.[currentSession] || [];
+  //     if (currentSessionAchievements.includes(achievementId)) {
+  //       alert(
+  //         `${student.name} already earned "${achievement.name}" this session!`
+  //       );
+  //       return;
+  //     }
+  //   }
+
+  //   // Now do the state update
+  //   setStudents((prev) => {
+  //     return prev.map((s) => {
+  //       if (s.id !== studentId) return s;
+
+  //       const updatedStudent = { ...s };
+
+  //       if (achievement.type === "lifetime") {
+  //         // Check again to be idempotent
+  //         if (!s.achievements?.includes(achievementId)) {
+  //           updatedStudent.achievements = [
+  //             ...(s.achievements || []),
+  //             achievementId,
+  //           ];
+  //           updatedStudent.lifetimeXP = (s.lifetimeXP || 0) + achievement.xp;
+  //         }
+  //       } else {
+  //         // Session achievement
+  //         const existingAchievements =
+  //           s.sessionAchievements?.[currentSession] || [];
+
+  //         if (!existingAchievements.includes(achievementId)) {
+  //           // Initialize if needed
+  //           if (!updatedStudent.sessionAchievements) {
+  //             updatedStudent.sessionAchievements = {};
+  //           }
+  //           updatedStudent.sessionAchievements[currentSession] = [
+  //             ...existingAchievements,
+  //             achievementId,
+  //           ];
+
+  //           if (!updatedStudent.sessionXP) {
+  //             updatedStudent.sessionXP = {};
+  //           }
+  //           updatedStudent.sessionXP[currentSession] =
+  //             (s.sessionXP?.[currentSession] || 0) + achievement.xp;
+
+  //           // Lifetime XP
+  //           const lifetimeContribution = Math.floor(achievement.xp * 0.3);
+  //           updatedStudent.lifetimeXP =
+  //             (s.lifetimeXP || 0) + lifetimeContribution;
+  //         }
+  //       }
+
+  //       return updatedStudent;
+  //     });
+  //   });
+  // };
+
+  // Award achievement - SIMPLE FINAL VERSION
   const awardAchievement = (studentId, achievementId) => {
     const achievement = achievements.find((a) => a.id === achievementId);
     if (!achievement) return;
 
+    // Check BEFORE state update to show alerts
+    const student = students.find((s) => s.id === studentId);
+    if (!student) return;
+
+    if (
+      achievement.type === "lifetime" &&
+      student.achievements?.includes(achievementId)
+    ) {
+      alert(`${student.name} already earned "${achievement.name}"!`);
+      return;
+    }
+
+    if (achievement.type === "session") {
+      const currentSessionAchievements =
+        student.sessionAchievements?.[currentSession] || [];
+      if (currentSessionAchievements.includes(achievementId)) {
+        alert(
+          `${student.name} already earned "${achievement.name}" this session!`
+        );
+        return;
+      }
+    }
+
+    // Now do the state update - using functional update to ensure we always get latest state
     setStudents((prev) => {
-      // Find the current state of the student
+      // Find the most current version of the student
       const currentStudent = prev.find((s) => s.id === studentId);
       if (!currentStudent) return prev;
 
-      // Check if already earned IN THE CURRENT STATE
-      if (achievement.type === "lifetime") {
-        if (currentStudent.achievements?.includes(achievementId)) {
-          // Already has it, return unchanged array
-          return prev;
-        }
-      } else {
-        const currentSessionAchievements =
+      // Check again with the most current data
+      if (achievement.type === "session") {
+        const currentAchievements =
           currentStudent.sessionAchievements?.[currentSession] || [];
-        if (currentSessionAchievements.includes(achievementId)) {
-          // Already has it, return unchanged array
+        if (currentAchievements.includes(achievementId)) {
+          // Already has it in the current state, no update needed
           return prev;
         }
       }
 
-      // Now we know we need to add it, so map through and update
+      // Now we definitely need to add it
       return prev.map((s) => {
-        if (s.id === studentId) {
-          if (achievement.type === "lifetime") {
-            // Lifetime achievement
-            return {
-              ...s,
-              achievements: [...(s.achievements || []), achievementId],
-              lifetimeXP: (s.lifetimeXP || 0) + achievement.xp,
-            };
-          } else {
-            // Session achievement
-            const newStudent = { ...s };
+        if (s.id !== studentId) return s;
 
-            // Initialize structures if needed
-            if (!newStudent.sessionAchievements) {
-              newStudent.sessionAchievements = {};
-            }
-            if (!newStudent.sessionAchievements[currentSession]) {
-              newStudent.sessionAchievements[currentSession] = [];
-            }
-            if (!newStudent.sessionXP) {
-              newStudent.sessionXP = {};
-            }
+        if (achievement.type === "lifetime") {
+          return {
+            ...s,
+            achievements: [...(s.achievements || []), achievementId],
+            lifetimeXP: (s.lifetimeXP || 0) + achievement.xp,
+          };
+        } else {
+          // Session achievement - do everything in one shot
+          const updatedStudent = {
+            ...s,
+            sessionAchievements: {
+              ...s.sessionAchievements,
+              [currentSession]: [
+                ...(s.sessionAchievements?.[currentSession] || []),
+                achievementId,
+              ],
+            },
+            sessionXP: {
+              ...s.sessionXP,
+              [currentSession]:
+                (s.sessionXP?.[currentSession] || 0) + achievement.xp,
+            },
+            lifetimeXP: (s.lifetimeXP || 0) + Math.floor(achievement.xp * 0.3),
+          };
 
-            // Add achievement
-            newStudent.sessionAchievements[currentSession] = [
-              ...(s.sessionAchievements?.[currentSession] || []),
-              achievementId,
-            ];
-
-            // Add session XP
-            newStudent.sessionXP[currentSession] =
-              (s.sessionXP?.[currentSession] || 0) + achievement.xp;
-
-            // Add lifetime XP (30%)
-            const lifetimeContribution = Math.floor(achievement.xp * 0.3);
-            newStudent.lifetimeXP = (s.lifetimeXP || 0) + lifetimeContribution;
-
-            return newStudent;
-          }
+          return updatedStudent;
         }
-        return s;
       });
     });
   };
