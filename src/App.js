@@ -346,28 +346,18 @@ const VEXLifetimeAchievementSystem = () => {
   };
 
   // Determine session category
+  // TODO: Make categories customizable in future version
   const getSessionCategory = (sessionName) => {
-    if (sessionName.includes("Summer")) return "summer";
-    if (sessionName.includes("GO")) return "school-go";
-    if (sessionName.includes("IQ")) return "school-iq";
-    if (sessionName.includes("Competition")) return "competition";
+    // Handle both string session names and session objects
+    const name =
+      typeof sessionName === "string" ? sessionName : sessionName.name;
+
+    if (name.includes("Summer")) return "summer";
+    if (name.includes("GO")) return "school-go";
+    if (name.includes("IQ")) return "school-iq";
+    if (name.includes("Competition")) return "competition";
     return "general";
   };
-
-  // // Get available achievements for current session
-  // const getAvailableSessionAchievements = (student) => {
-  //   const earnedInSession = student.sessionAchievements?.[currentSession] || [];
-  //   const sessionCategory = getSessionCategory(currentSession);
-
-  //   return achievements.filter(
-  //     (a) =>
-  //       a.type === "session" &&
-  //       a.category === sessionCategory &&
-  //       !earnedInSession.includes(a.id)
-  //   );
-  // };
-
-  // DEBUG VERSION - Add console.logs to identify the issue
 
   // Get available achievements for current session - WITH DEBUG
   const getAvailableSessionAchievements = (student) => {
