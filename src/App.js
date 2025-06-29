@@ -406,94 +406,76 @@ const VEXLifetimeAchievementSystem = () => {
     );
   };
 
-  // Award achievement - COMPLETE FIXED VERSION (Idempotent for React StrictMode)
+  // Award achievement - Stable version that works with React StrictMode
   const awardAchievement = (studentId, achievementId) => {
     const achievement = achievements.find((a) => a.id === achievementId);
     if (!achievement) return;
 
-    // First, check if already earned BEFORE updating state
-    const student = students.find((s) => s.id === studentId);
-    if (!student) return;
+    setStudents((prev) => {
+      // Find the current state of the student
+      const currentStudent = prev.find((s) => s.id === studentId);
+      if (!currentStudent) return prev;
 
-    // Check if already earned
-    if (
-      achievement.type === "lifetime" &&
-      student.achievements?.includes(achievementId)
-    ) {
-      alert(`${student.name} already earned "${achievement.name}"!`);
-      return;
-    }
+      // Check if already earned IN THE CURRENT STATE
+      if (achievement.type === "lifetime") {
+        if (currentStudent.achievements?.includes(achievementId)) {
+          // Already has it, return unchanged array
+          return prev;
+        }
+      } else {
+        const currentSessionAchievements =
+          currentStudent.sessionAchievements?.[currentSession] || [];
+        if (currentSessionAchievements.includes(achievementId)) {
+          // Already has it, return unchanged array
+          return prev;
+        }
+      }
 
-    const currentSessionAchievements =
-      student.sessionAchievements?.[currentSession] || [];
-    if (
-      achievement.type === "session" &&
-      currentSessionAchievements.includes(achievementId)
-    ) {
-      alert(
-        `${student.name} already earned "${achievement.name}" this session!`
-      );
-      return;
-    }
-
-    // Now proceed with the update
-    setStudents((prev) =>
-      prev.map((s) => {
+      // Now we know we need to add it, so map through and update
+      return prev.map((s) => {
         if (s.id === studentId) {
-          const newStudent = { ...s };
-
           if (achievement.type === "lifetime") {
             // Lifetime achievement
-            newStudent.achievements = [
-              ...(s.achievements || []),
-              achievementId,
-            ];
-            newStudent.lifetimeXP = (s.lifetimeXP || 0) + achievement.xp;
+            return {
+              ...s,
+              achievements: [...(s.achievements || []), achievementId],
+              lifetimeXP: (s.lifetimeXP || 0) + achievement.xp,
+            };
           } else {
             // Session achievement
+            const newStudent = { ...s };
+
+            // Initialize structures if needed
             if (!newStudent.sessionAchievements) {
               newStudent.sessionAchievements = {};
             }
             if (!newStudent.sessionAchievements[currentSession]) {
               newStudent.sessionAchievements[currentSession] = [];
             }
-
-            // Award session XP - based on original student data
             if (!newStudent.sessionXP) {
               newStudent.sessionXP = {};
             }
 
-            // Check if already has the achievement in the ORIGINAL data
-            const existingSessionAchievements =
-              s.sessionAchievements?.[currentSession] || [];
+            // Add achievement
+            newStudent.sessionAchievements[currentSession] = [
+              ...(s.sessionAchievements?.[currentSession] || []),
+              achievementId,
+            ];
 
-            if (!existingSessionAchievements.includes(achievementId)) {
-              // Doesn't have it yet - add achievement and XP
-              newStudent.sessionAchievements[currentSession] = [
-                ...existingSessionAchievements,
-                achievementId,
-              ];
+            // Add session XP
+            newStudent.sessionXP[currentSession] =
+              (s.sessionXP?.[currentSession] || 0) + achievement.xp;
 
-              const originalSessionXP = s.sessionXP?.[currentSession] || 0;
-              newStudent.sessionXP[currentSession] =
-                originalSessionXP + achievement.xp;
+            // Add lifetime XP (30%)
+            const lifetimeContribution = Math.floor(achievement.xp * 0.3);
+            newStudent.lifetimeXP = (s.lifetimeXP || 0) + lifetimeContribution;
 
-              // 30% to lifetime
-              const lifetimeContribution = Math.floor(achievement.xp * 0.3);
-              newStudent.lifetimeXP =
-                (s.lifetimeXP || 0) + lifetimeContribution;
-            } else {
-              // Already has it - just return the original student unchanged
-              // This handles React StrictMode's double execution
-              return s;
-            }
+            return newStudent;
           }
-
-          return newStudent;
         }
         return s;
-      })
-    );
+      });
+    });
   };
 
   // Get how many times an achievement was earned across all sessions
