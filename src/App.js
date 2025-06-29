@@ -292,6 +292,20 @@ const VEXLifetimeAchievementSystem = () => {
     if (savedSkills) setSkillsScores(JSON.parse(savedSkills));
   }, []);
 
+  // Validate current session
+  useEffect(() => {
+    if (
+      sessions.length > 0 &&
+      !sessions.some((s) => s.name === currentSession)
+    ) {
+      // Current session doesn't exist, switch to first active session
+      const firstActiveSession = sessions.find((s) => s.isActive);
+      if (firstActiveSession) {
+        setCurrentSession(firstActiveSession.name);
+      }
+    }
+  }, [sessions, currentSession]);
+
   // Save data whenever it changes
   useEffect(() => {
     localStorage.setItem("vexLifetimeStudents", JSON.stringify(students));
@@ -2383,6 +2397,14 @@ const VEXLifetimeAchievementSystem = () => {
       };
 
       setSessions([...sessions, session]);
+
+      // If this is the first session OR current session doesn't exist, set it as current
+      if (
+        sessions.length === 0 ||
+        !sessions.some((s) => s.name === currentSession)
+      ) {
+        setCurrentSession(session.name);
+      }
 
       // Reset form
       setNewSession({
