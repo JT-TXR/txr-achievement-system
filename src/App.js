@@ -658,6 +658,7 @@ const VEXLifetimeAchievementSystem = () => {
       avatar: "🤖",
       joinDate: new Date().toISOString(),
       sessionsAttended: [currentSession],
+      enrolledSessions: [currentSession], // Add this line - auto-enroll in current session
     };
     setStudents([...students, newStudent]);
   };
@@ -764,28 +765,118 @@ const VEXLifetimeAchievementSystem = () => {
             </div>
           </div>
 
+          {/* Current Session Info */}
+          <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+            <p className="text-sm text-blue-800">
+              <strong>Current Session:</strong>{" "}
+              {currentSession || "No session selected"}
+            </p>
+            <p className="text-xs text-blue-600 mt-1">
+              Use the Enroll/Unenroll buttons to manage student enrollment in
+              this session.
+            </p>
+          </div>
+
           <div className="space-y-2">
             {students.map((student) => (
               <div
                 key={student.id}
                 className="flex items-center justify-between p-3 bg-gray-50 rounded"
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-1">
                   <span className="text-2xl">{student.avatar}</span>
-                  <div>
+                  <div className="flex-1">
                     <div className="font-semibold">{student.name}</div>
                     <div className="text-sm text-gray-600">
                       {student.program} • Lifetime: {student.lifetimeXP} XP •
                       Session: {getSessionXP(student)} XP
                     </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      Enrolled in:{" "}
+                      {(
+                        student.enrolledSessions ||
+                        student.sessionsAttended ||
+                        []
+                      )
+                        .filter((session) =>
+                          sessions.some((s) => s.name === session && s.isActive)
+                        )
+                        .join(", ") || "No sessions"}
+                    </div>
                   </div>
                 </div>
-                <button
-                  onClick={() => removeStudent(student.id)}
-                  className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
-                >
-                  Remove
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      const isEnrolled =
+                        student.enrolledSessions?.includes(currentSession) ||
+                        student.sessionsAttended?.includes(currentSession);
+
+                      if (isEnrolled) {
+                        // Unenroll
+                        setStudents(
+                          students.map((s) =>
+                            s.id === student.id
+                              ? {
+                                  ...s,
+                                  enrolledSessions: (
+                                    s.enrolledSessions ||
+                                    s.sessionsAttended ||
+                                    []
+                                  ).filter(
+                                    (session) => session !== currentSession
+                                  ),
+                                  sessionsAttended: (
+                                    s.sessionsAttended || []
+                                  ).filter(
+                                    (session) => session !== currentSession
+                                  ),
+                                }
+                              : s
+                          )
+                        );
+                      } else {
+                        // Enroll
+                        setStudents(
+                          students.map((s) =>
+                            s.id === student.id
+                              ? {
+                                  ...s,
+                                  enrolledSessions: [
+                                    ...(s.enrolledSessions ||
+                                      s.sessionsAttended ||
+                                      []),
+                                    currentSession,
+                                  ],
+                                  sessionsAttended: [
+                                    ...(s.sessionsAttended || []),
+                                    currentSession,
+                                  ],
+                                }
+                              : s
+                          )
+                        );
+                      }
+                    }}
+                    className={`px-3 py-1 rounded text-white ${
+                      student.enrolledSessions?.includes(currentSession) ||
+                      student.sessionsAttended?.includes(currentSession)
+                        ? "bg-gray-500 hover:bg-gray-600"
+                        : "bg-green-500 hover:bg-green-600"
+                    }`}
+                  >
+                    {student.enrolledSessions?.includes(currentSession) ||
+                    student.sessionsAttended?.includes(currentSession)
+                      ? "Unenroll"
+                      : "Enroll"}
+                  </button>
+                  <button
+                    onClick={() => removeStudent(student.id)}
+                    className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
+                  >
+                    Remove
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -3190,23 +3281,45 @@ const VEXLifetimeAchievementSystem = () => {
         {currentView === "dashboard" ? (
           <div>
             <h2 className="text-2xl font-bold mb-4">
-              Student Progress - {currentSession}
+              {sessions.length > 0 && currentSession
+                ? `Student Progress - ${currentSession}`
+                : "Student Progress - No Session Selected"}
             </h2>
-            {students.length === 0 ? (
+            {students.filter(
+              (s) =>
+                s.enrolledSessions?.includes(currentSession) ||
+                s.sessionsAttended?.includes(currentSession)
+            ).length === 0 ? (
               <div className="text-center py-12">
-                <p className="text-xl text-gray-600 mb-4">No students yet!</p>
+                <p className="text-xl text-gray-600 mb-4">
+                  {sessions.length === 0
+                    ? "No sessions created yet!"
+                    : "No students enrolled in this session!"}
+                </p>
                 <button
-                  onClick={() => setShowStudentManager(true)}
+                  onClick={() =>
+                    sessions.length === 0
+                      ? setShowSessionManager(true)
+                      : setShowStudentManager(true)
+                  }
                   className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
                 >
-                  Add Your First Student
+                  {sessions.length === 0
+                    ? "Create Your First Session"
+                    : "Add Students to Session"}
                 </button>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {students.map((student) => (
-                  <StudentCard key={student.id} student={student} />
-                ))}
+                {students
+                  .filter(
+                    (student) =>
+                      student.enrolledSessions?.includes(currentSession) ||
+                      student.sessionsAttended?.includes(currentSession)
+                  )
+                  .map((student) => (
+                    <StudentCard key={student.id} student={student} />
+                  ))}
               </div>
             )}
           </div>
