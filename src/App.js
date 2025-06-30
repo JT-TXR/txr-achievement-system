@@ -2000,6 +2000,12 @@ const VEXLifetimeAchievementSystem = () => {
       >
         📊 Tournament
       </button>
+      <button
+        onClick={() => setShowAttendanceManager(true)}
+        className="px-3 py-1 bg-purple-500 text-white rounded hover:bg-purple-600"
+      >
+        📅 Attendance
+      </button>
     </div>
   );
 
@@ -3849,6 +3855,7 @@ const VEXLifetimeAchievementSystem = () => {
       </div>
       {selectedStudent && <StudentDetail />}
       {showSessionManager && <SessionManager />}
+      {showAttendanceManager && <AttendanceManager />}
       {showStudentManager && <StudentManager />}
       {showAchievementManager && <AchievementManager />}
       {showBulkAward && <BulkAchievementAward />}
