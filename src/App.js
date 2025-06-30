@@ -2351,8 +2351,27 @@ const VEXLifetimeAchievementSystem = () => {
     // Helper function to generate class dates based on selected days
     const generateClassDates = (startDate, endDate, selectedDays) => {
       const dates = [];
-      const start = new Date(startDate);
-      const end = new Date(endDate);
+
+      // Parse dates manually to avoid timezone issues
+      const [startYear, startMonth, startDay] = startDate
+        .split("-")
+        .map(Number);
+      const [endYear, endMonth, endDay] = endDate.split("-").map(Number);
+
+      // Create dates in local timezone
+      const start = new Date(startYear, startMonth - 1, startDay);
+      const end = new Date(endYear, endMonth - 1, endDay);
+
+      // Day names array for comparison
+      const dayNames = [
+        "sunday",
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+      ];
 
       // Iterate through each day in the range
       for (
@@ -2360,12 +2379,14 @@ const VEXLifetimeAchievementSystem = () => {
         date <= end;
         date.setDate(date.getDate() + 1)
       ) {
-        const dayName = date
-          .toLocaleDateString("en-US", { weekday: "long" })
-          .toLowerCase();
+        const dayName = dayNames[date.getDay()];
 
         if (selectedDays.includes(dayName)) {
-          dates.push(new Date(date).toISOString());
+          // Format as YYYY-MM-DD string
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, "0");
+          const day = String(date.getDate()).padStart(2, "0");
+          dates.push(`${year}-${month}-${day}`);
         }
       }
 
@@ -2647,12 +2668,15 @@ const VEXLifetimeAchievementSystem = () => {
                           .slice(0, 10)
                           .map((date, index) => (
                             <div key={index}>
-                              {new Date(date).toLocaleDateString("en-US", {
-                                weekday: "short",
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              })}
+                              {new Date(date + "T12:00:00").toLocaleDateString(
+                                "en-US",
+                                {
+                                  weekday: "short",
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                }
+                              )}
                             </div>
                           ))}
                         {generateClassDates(
