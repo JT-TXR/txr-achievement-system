@@ -3256,6 +3256,44 @@ const VEXLifetimeAchievementSystem = () => {
         (nextLevel.minXP - lifetimeLevel.minXP)) *
       100;
 
+    // Add attendance rate calculation
+    const getAttendanceRate = () => {
+      const currentSessionObj = sessions.find((s) => s.name === currentSession);
+      const sessionDates = currentSessionObj?.classDates || [];
+
+      if (sessionDates.length === 0) return null;
+
+      // Get today's date at noon to avoid timezone issues
+      const today = new Date();
+      today.setHours(12, 0, 0, 0);
+      const todayStr = today.toISOString().split("T")[0];
+
+      // Only count classes that have already happened (including today)
+      const pastDates = sessionDates.filter((date) => {
+        const classDate = new Date(date + "T12:00:00");
+        return classDate <= today;
+      });
+
+      if (pastDates.length === 0) return null;
+
+      const attended = pastDates.filter((date) => {
+        const status = attendance[currentSession]?.[date]?.[student.id];
+        return status === "present" || status === "late";
+      }).length;
+
+      // Debug log
+      console.log(
+        `Student ${student.name}: ${attended}/${
+          pastDates.length
+        } = ${Math.round((attended / pastDates.length) * 100)}%`
+      );
+      console.log("Past dates:", pastDates);
+      console.log("Today:", todayStr);
+
+      return Math.round((attended / pastDates.length) * 100);
+    };
+    const attendanceRate = getAttendanceRate();
+
     const getProgramColor = (program) => {
       switch (program) {
         case "VEX GO":
@@ -3282,7 +3320,13 @@ const VEXLifetimeAchievementSystem = () => {
           <div className="flex items-center gap-3">
             <div className="text-5xl">{student.avatar}</div>
             <div>
-              <h3 className="text-xl font-bold">{student.name}</h3>
+              <h3 className="font-bold text-lg">{student.name}</h3>
+              {attendanceRate !== null && (
+                <div className="text-sm text-gray-600 flex items-center gap-1">
+                  <span>📅</span>
+                  <span>Attendance: {attendanceRate}%</span>
+                </div>
+              )}
               <span
                 className={`text-xs px-2 py-1 rounded-full ${getProgramColor(
                   student.program
