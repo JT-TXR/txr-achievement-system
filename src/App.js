@@ -2930,6 +2930,7 @@ const VEXLifetimeAchievementSystem = () => {
   // Attendance Manager Component
   const AttendanceManager = () => {
     const currentSessionObj = sessions.find((s) => s.name === currentSession);
+    const [showAllDates, setShowAllDates] = useState(false);
 
     // Initialize with next class date or today
     const getDefaultDate = () => {
@@ -3057,7 +3058,12 @@ const VEXLifetimeAchievementSystem = () => {
                       </p>
                       <div className="flex gap-2 flex-wrap">
                         {currentSessionObj.classDates
-                          .slice(0, 7)
+                          .slice(
+                            0,
+                            showAllDates
+                              ? currentSessionObj.classDates.length
+                              : 7
+                          )
                           .map((date, index) => (
                             <button
                               key={index}
@@ -3078,9 +3084,16 @@ const VEXLifetimeAchievementSystem = () => {
                             </button>
                           ))}
                         {currentSessionObj.classDates.length > 7 && (
-                          <span className="text-sm text-gray-500 py-1">
-                            +{currentSessionObj.classDates.length - 7} more
-                          </span>
+                          <button
+                            onClick={() => setShowAllDates(!showAllDates)}
+                            className="px-3 py-1 text-sm text-blue-600 hover:text-blue-800 font-semibold"
+                          >
+                            {showAllDates
+                              ? "− Show less"
+                              : `+${
+                                  currentSessionObj.classDates.length - 7
+                                } more`}
+                          </button>
                         )}
                       </div>
                     </div>
