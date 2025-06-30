@@ -2620,6 +2620,61 @@ const VEXLifetimeAchievementSystem = () => {
                   </div>
                 </div>
               )}
+
+              {/* Preview Generated Dates */}
+              {newSession.startDate &&
+                newSession.endDate &&
+                newSession.selectedDays.length > 0 && (
+                  <div className="mt-3 p-3 bg-gray-50 rounded">
+                    <label className="text-sm text-gray-600 font-semibold block mb-2">
+                      Preview:{" "}
+                      {
+                        generateClassDates(
+                          newSession.startDate,
+                          newSession.endDate,
+                          newSession.selectedDays
+                        ).length
+                      }{" "}
+                      Classes
+                    </label>
+                    <div className="max-h-32 overflow-y-auto">
+                      <div className="text-xs text-gray-500 space-y-1">
+                        {generateClassDates(
+                          newSession.startDate,
+                          newSession.endDate,
+                          newSession.selectedDays
+                        )
+                          .slice(0, 10)
+                          .map((date, index) => (
+                            <div key={index}>
+                              {new Date(date).toLocaleDateString("en-US", {
+                                weekday: "short",
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              })}
+                            </div>
+                          ))}
+                        {generateClassDates(
+                          newSession.startDate,
+                          newSession.endDate,
+                          newSession.selectedDays
+                        ).length > 10 && (
+                          <div className="font-semibold">
+                            ... and{" "}
+                            {generateClassDates(
+                              newSession.startDate,
+                              newSession.endDate,
+                              newSession.selectedDays
+                            ).length - 10}{" "}
+                            more
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
               <div className="flex items-end">
                 <button
                   onClick={addSession}
@@ -2766,6 +2821,12 @@ const VEXLifetimeAchievementSystem = () => {
                                   : "Ongoing"}
                               </span>
                             )}
+                            {session.classDates &&
+                              session.classDates.length > 0 && (
+                                <span className="ml-2 text-xs">
+                                  ({session.classDates.length} classes)
+                                </span>
+                              )}
                           </div>
                         </div>
                         <div className="flex gap-2">
