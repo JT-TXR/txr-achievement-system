@@ -197,6 +197,11 @@ const VEXLifetimeAchievementSystem = () => {
   const [sessions, setSessions] = useState([]);
   const [showSessionManager, setShowSessionManager] = useState(false);
 
+  // Attendance tracking state
+  const [attendance, setAttendance] = useState({}); // { sessionId: { date: { studentId: 'present'|'absent'|'late' } } }
+  const [attendanceSelectedDate, setAttendanceSelectedDate] = useState(null);
+  const [showAttendanceManager, setShowAttendanceManager] = useState(false);
+
   // Helper to migrate old string sessions to new format
   const migrateSessionsToNewFormat = (oldSessions) => {
     if (oldSessions.length === 0) return [];
@@ -278,6 +283,8 @@ const VEXLifetimeAchievementSystem = () => {
     const savedTeams = localStorage.getItem("vexTeams");
     const savedMatches = localStorage.getItem("vexTeamworkMatches");
     const savedSkills = localStorage.getItem("vexSkillsScores");
+    const savedAttendance = localStorage.getItem("vexAttendance");
+    if (savedAttendance) setAttendance(JSON.parse(savedAttendance));
 
     if (savedStudents) setStudents(JSON.parse(savedStudents));
     if (savedAchievements) setAchievements(JSON.parse(savedAchievements));
@@ -328,6 +335,10 @@ const VEXLifetimeAchievementSystem = () => {
     localStorage.setItem("vexSessions", JSON.stringify(sessions));
     localStorage.setItem("vexCurrentSession", currentSession);
   }, [sessions, currentSession]);
+
+  useEffect(() => {
+    localStorage.setItem("vexAttendance", JSON.stringify(attendance));
+  }, [attendance]);
 
   useEffect(() => {
     localStorage.setItem(
@@ -1990,6 +2001,12 @@ const VEXLifetimeAchievementSystem = () => {
       >
         📊 Tournament
       </button>
+      <button
+        onClick={() => setShowAttendanceManager(true)}
+        className="px-3 py-1 bg-purple-500 text-white rounded hover:bg-purple-600"
+      >
+        📅 Attendance
+      </button>
     </div>
   );
 
@@ -2326,6 +2343,7 @@ const VEXLifetimeAchievementSystem = () => {
       type: "general",
       startDate: "",
       endDate: "",
+      selectedDays: [],
     });
     const [editingSession, setEditingSession] = useState(null);
     const [showArchived, setShowArchived] = useState(false);
@@ -2336,6 +2354,51 @@ const VEXLifetimeAchievementSystem = () => {
     const archivedSessions = sessions
       .filter((s) => !s.isActive)
       .sort((a, b) => a.order - b.order);
+
+    // Helper function to generate class dates based on selected days
+    const generateClassDates = (startDate, endDate, selectedDays) => {
+      const dates = [];
+
+      // Parse dates manually to avoid timezone issues
+      const [startYear, startMonth, startDay] = startDate
+        .split("-")
+        .map(Number);
+      const [endYear, endMonth, endDay] = endDate.split("-").map(Number);
+
+      // Create dates in local timezone
+      const start = new Date(startYear, startMonth - 1, startDay);
+      const end = new Date(endYear, endMonth - 1, endDay);
+
+      // Day names array for comparison
+      const dayNames = [
+        "sunday",
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+      ];
+
+      // Iterate through each day in the range
+      for (
+        let date = new Date(start);
+        date <= end;
+        date.setDate(date.getDate() + 1)
+      ) {
+        const dayName = dayNames[date.getDay()];
+
+        if (selectedDays.includes(dayName)) {
+          // Format as YYYY-MM-DD string
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, "0");
+          const day = String(date.getDate()).padStart(2, "0");
+          dates.push(`${year}-${month}-${day}`);
+        }
+      }
+
+      return dates;
+    };
 
     const addSession = () => {
       if (!newSession.name) return;
@@ -2353,6 +2416,17 @@ const VEXLifetimeAchievementSystem = () => {
         isActive: true,
         order: sessions.length,
         createdAt: new Date().toISOString(),
+        // Scheduling fields
+        scheduleType: newSession.selectedDays.length > 0 ? "weekly" : "custom",
+        selectedDays: newSession.selectedDays,
+        classDates:
+          newSession.selectedDays.length > 0
+            ? generateClassDates(
+                newSession.startDate,
+                newSession.endDate,
+                newSession.selectedDays
+              )
+            : [],
       };
 
       setSessions([...sessions, session]);
@@ -2371,6 +2445,7 @@ const VEXLifetimeAchievementSystem = () => {
         type: "general",
         startDate: "",
         endDate: "",
+        selectedDays: [],
       });
     };
 
@@ -2529,6 +2604,108 @@ const VEXLifetimeAchievementSystem = () => {
                   className="w-full px-3 py-2 border rounded"
                 />
               </div>
+              {/* Day Selection - Add this new section */}
+              {newSession.startDate && newSession.endDate && (
+                <div className="mt-3">
+                  <label className="text-sm text-gray-600 mb-2 block">
+                    Select Days
+                  </label>
+                  <div className="flex gap-2 flex-wrap">
+                    {[
+                      "Monday",
+                      "Tuesday",
+                      "Wednesday",
+                      "Thursday",
+                      "Friday",
+                      "Saturday",
+                      "Sunday",
+                    ].map((day) => (
+                      <button
+                        key={day}
+                        type="button"
+                        onClick={() => {
+                          const dayLower = day.toLowerCase();
+                          setNewSession({
+                            ...newSession,
+                            selectedDays: newSession.selectedDays.includes(
+                              dayLower
+                            )
+                              ? newSession.selectedDays.filter(
+                                  (d) => d !== dayLower
+                                )
+                              : [...newSession.selectedDays, dayLower],
+                          });
+                        }}
+                        className={`px-3 py-1 rounded ${
+                          newSession.selectedDays.includes(day.toLowerCase())
+                            ? "bg-blue-500 text-white"
+                            : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                        }`}
+                      >
+                        {day.slice(0, 3)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Preview Generated Dates */}
+              {newSession.startDate &&
+                newSession.endDate &&
+                newSession.selectedDays.length > 0 && (
+                  <div className="mt-3 p-3 bg-gray-50 rounded">
+                    <label className="text-sm text-gray-600 font-semibold block mb-2">
+                      Preview:{" "}
+                      {
+                        generateClassDates(
+                          newSession.startDate,
+                          newSession.endDate,
+                          newSession.selectedDays
+                        ).length
+                      }{" "}
+                      Classes
+                    </label>
+                    <div className="max-h-32 overflow-y-auto">
+                      <div className="text-xs text-gray-500 space-y-1">
+                        {generateClassDates(
+                          newSession.startDate,
+                          newSession.endDate,
+                          newSession.selectedDays
+                        )
+                          .slice(0, 10)
+                          .map((date, index) => (
+                            <div key={index}>
+                              {new Date(date + "T12:00:00").toLocaleDateString(
+                                "en-US",
+                                {
+                                  weekday: "short",
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                }
+                              )}
+                            </div>
+                          ))}
+                        {generateClassDates(
+                          newSession.startDate,
+                          newSession.endDate,
+                          newSession.selectedDays
+                        ).length > 10 && (
+                          <div className="font-semibold">
+                            ... and{" "}
+                            {generateClassDates(
+                              newSession.startDate,
+                              newSession.endDate,
+                              newSession.selectedDays
+                            ).length - 10}{" "}
+                            more
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
               <div className="flex items-end">
                 <button
                   onClick={addSession}
@@ -2675,6 +2852,12 @@ const VEXLifetimeAchievementSystem = () => {
                                   : "Ongoing"}
                               </span>
                             )}
+                            {session.classDates &&
+                              session.classDates.length > 0 && (
+                                <span className="ml-2 text-xs">
+                                  ({session.classDates.length} classes)
+                                </span>
+                              )}
                           </div>
                         </div>
                         <div className="flex gap-2">
@@ -2744,6 +2927,325 @@ const VEXLifetimeAchievementSystem = () => {
     );
   };
 
+  // Attendance Manager Component
+  const AttendanceManager = () => {
+    const currentSessionObj = sessions.find((s) => s.name === currentSession);
+    const [showAllDates, setShowAllDates] = useState(false);
+
+    // Initialize with next class date or today
+    const getDefaultDate = () => {
+      const today = new Date().toISOString().split("T")[0];
+      if (currentSessionObj?.classDates?.length > 0) {
+        // Find the next upcoming class date or most recent past date
+        const futureDates = currentSessionObj.classDates.filter(
+          (date) => date >= today
+        );
+        const pastDates = currentSessionObj.classDates.filter(
+          (date) => date < today
+        );
+
+        if (futureDates.length > 0) {
+          return futureDates[0]; // Next upcoming class
+        } else if (pastDates.length > 0) {
+          return pastDates[pastDates.length - 1]; // Most recent past class
+        }
+      }
+      return today;
+    };
+
+    // Use the parent state, or default if not set
+    const selectedDate = attendanceSelectedDate || getDefaultDate();
+    const setSelectedDate = setAttendanceSelectedDate;
+
+    // Get students enrolled in current session
+    const enrolledStudents = students.filter(
+      (s) =>
+        s.enrolledSessions?.includes(currentSession) ||
+        s.sessionsAttended?.includes(currentSession)
+    );
+
+    // Check if selected date is a class date
+    const isClassDate = currentSessionObj?.classDates?.includes(selectedDate);
+
+    // Get or initialize attendance for this session and date
+    const getAttendanceStatus = (studentId) => {
+      return (
+        attendance[currentSession]?.[selectedDate]?.[studentId] || "unmarked"
+      );
+    };
+
+    const updateAttendance = (studentId, status) => {
+      setAttendance((prev) => ({
+        ...prev,
+        [currentSession]: {
+          ...prev[currentSession],
+          [selectedDate]: {
+            ...prev[currentSession]?.[selectedDate],
+            [studentId]: status,
+          },
+        },
+      }));
+    };
+
+    const markAllPresent = () => {
+      const newDateAttendance = {};
+      enrolledStudents.forEach((student) => {
+        newDateAttendance[student.id] = "present";
+      });
+
+      setAttendance((prev) => ({
+        ...prev,
+        [currentSession]: {
+          ...prev[currentSession],
+          [selectedDate]: newDateAttendance,
+        },
+      }));
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold">
+              📅 Attendance - {currentSession}
+            </h2>
+            <button
+              onClick={() => {
+                setShowAttendanceManager(false);
+                setAttendanceSelectedDate(null); // Reset the date
+              }}
+              className="text-2xl hover:text-gray-600"
+            >
+              ×
+            </button>
+          </div>
+
+          {!currentSessionObj ? (
+            <p className="text-gray-600">Please select a session first.</p>
+          ) : (
+            <>
+              {/* Date Selection */}
+              <div className="mb-6 p-4 bg-blue-50 rounded-lg">
+                <div className="flex items-center gap-4">
+                  <div>
+                    <label className="text-sm font-semibold text-gray-700">
+                      Select Date:
+                    </label>
+                    <input
+                      type="date"
+                      value={selectedDate}
+                      onChange={(e) => setSelectedDate(e.target.value)}
+                      className="ml-2 px-3 py-2 border rounded"
+                    />
+                  </div>
+                  {isClassDate ? (
+                    <span className="text-green-600 font-semibold">
+                      ✓ Scheduled Class
+                    </span>
+                  ) : (
+                    <span className="text-gray-500">
+                      Not a scheduled class date
+                    </span>
+                  )}
+                </div>
+
+                {/* Quick Jump to Class Dates */}
+                {currentSessionObj.classDates &&
+                  currentSessionObj.classDates.length > 0 && (
+                    <div className="mt-3">
+                      <p className="text-sm text-gray-600 mb-2">
+                        Quick jump to class:
+                      </p>
+                      <div className="flex gap-2 flex-wrap">
+                        {currentSessionObj.classDates
+                          .slice(
+                            0,
+                            showAllDates
+                              ? currentSessionObj.classDates.length
+                              : 7
+                          )
+                          .map((date, index) => (
+                            <button
+                              key={index}
+                              onClick={() => setSelectedDate(date)}
+                              className={`px-3 py-1 text-sm rounded ${
+                                date === selectedDate
+                                  ? "bg-blue-500 text-white"
+                                  : "bg-gray-200 hover:bg-gray-300"
+                              }`}
+                            >
+                              {new Date(date + "T12:00:00").toLocaleDateString(
+                                "en-US",
+                                {
+                                  month: "short",
+                                  day: "numeric",
+                                }
+                              )}
+                            </button>
+                          ))}
+                        {currentSessionObj.classDates.length > 7 && (
+                          <button
+                            onClick={() => setShowAllDates(!showAllDates)}
+                            className="px-3 py-1 text-sm text-blue-600 hover:text-blue-800 font-semibold"
+                          >
+                            {showAllDates
+                              ? "− Show less"
+                              : `+${
+                                  currentSessionObj.classDates.length - 7
+                                } more`}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+              </div>
+
+              {/* Attendance Actions */}
+              <div className="mb-4 flex justify-between items-center">
+                <h3 className="font-bold">
+                  Students ({enrolledStudents.length})
+                </h3>
+                <button
+                  onClick={markAllPresent}
+                  className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+                >
+                  Mark All Present
+                </button>
+              </div>
+
+              {/* Warning for non-class dates */}
+              {!isClassDate && enrolledStudents.length > 0 && (
+                <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-sm text-yellow-800">
+                    ⚠️ This is not a scheduled class date. You can still mark
+                    attendance for makeup classes or special circumstances.
+                  </p>
+                </div>
+              )}
+
+              {/* Student Attendance List */}
+              <div className="space-y-2">
+                {enrolledStudents.length === 0 ? (
+                  <p className="text-gray-500 text-center py-8">
+                    No students enrolled in this session.
+                  </p>
+                ) : (
+                  enrolledStudents.map((student) => {
+                    const status = getAttendanceStatus(student.id);
+                    return (
+                      <div
+                        key={student.id}
+                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl">{student.avatar}</span>
+                          <div>
+                            <div className="font-semibold">{student.name}</div>
+                            <div className="text-sm text-gray-600">
+                              {student.program}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() =>
+                              updateAttendance(student.id, "present")
+                            }
+                            className={`px-4 py-2 rounded ${
+                              status === "present"
+                                ? "bg-green-500 text-white"
+                                : "bg-gray-200 hover:bg-gray-300"
+                            }`}
+                          >
+                            Present
+                          </button>
+                          <button
+                            onClick={() =>
+                              updateAttendance(student.id, "absent")
+                            }
+                            className={`px-4 py-2 rounded ${
+                              status === "absent"
+                                ? "bg-red-500 text-white"
+                                : "bg-gray-200 hover:bg-gray-300"
+                            }`}
+                          >
+                            Absent
+                          </button>
+                          <button
+                            onClick={() => updateAttendance(student.id, "late")}
+                            className={`px-4 py-2 rounded ${
+                              status === "late"
+                                ? "bg-yellow-500 text-white"
+                                : "bg-gray-200 hover:bg-gray-300"
+                            }`}
+                          >
+                            Late
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Attendance Summary */}
+              {enrolledStudents.length > 0 && (
+                <div className="mt-6 p-4 bg-gray-100 rounded-lg">
+                  <h4 className="font-semibold mb-2">
+                    Summary for{" "}
+                    {new Date(selectedDate + "T12:00:00").toLocaleDateString()}:
+                  </h4>
+                  <div className="grid grid-cols-4 gap-4 text-center">
+                    <div>
+                      <div className="text-2xl font-bold text-green-600">
+                        {
+                          enrolledStudents.filter(
+                            (s) => getAttendanceStatus(s.id) === "present"
+                          ).length
+                        }
+                      </div>
+                      <div className="text-sm text-gray-600">Present</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-red-600">
+                        {
+                          enrolledStudents.filter(
+                            (s) => getAttendanceStatus(s.id) === "absent"
+                          ).length
+                        }
+                      </div>
+                      <div className="text-sm text-gray-600">Absent</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-yellow-600">
+                        {
+                          enrolledStudents.filter(
+                            (s) => getAttendanceStatus(s.id) === "late"
+                          ).length
+                        }
+                      </div>
+                      <div className="text-sm text-gray-600">Late</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-gray-400">
+                        {
+                          enrolledStudents.filter(
+                            (s) => getAttendanceStatus(s.id) === "unmarked"
+                          ).length
+                        }
+                      </div>
+                      <div className="text-sm text-gray-600">Unmarked</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   // Student Card Component
   const StudentCard = ({ student }) => {
     const lifetimeLevel = getStudentLevel(student.lifetimeXP || 0);
@@ -2753,6 +3255,44 @@ const VEXLifetimeAchievementSystem = () => {
       ((student.lifetimeXP - lifetimeLevel.minXP) /
         (nextLevel.minXP - lifetimeLevel.minXP)) *
       100;
+
+    // Add attendance rate calculation
+    const getAttendanceRate = () => {
+      const currentSessionObj = sessions.find((s) => s.name === currentSession);
+      const sessionDates = currentSessionObj?.classDates || [];
+
+      if (sessionDates.length === 0) return null;
+
+      // Get today's date at noon to avoid timezone issues
+      const today = new Date();
+      today.setHours(12, 0, 0, 0);
+      const todayStr = today.toISOString().split("T")[0];
+
+      // Only count classes that have already happened (including today)
+      const pastDates = sessionDates.filter((date) => {
+        const classDate = new Date(date + "T12:00:00");
+        return classDate <= today;
+      });
+
+      if (pastDates.length === 0) return null;
+
+      const attended = pastDates.filter((date) => {
+        const status = attendance[currentSession]?.[date]?.[student.id];
+        return status === "present" || status === "late";
+      }).length;
+
+      // Debug log
+      console.log(
+        `Student ${student.name}: ${attended}/${
+          pastDates.length
+        } = ${Math.round((attended / pastDates.length) * 100)}%`
+      );
+      console.log("Past dates:", pastDates);
+      console.log("Today:", todayStr);
+
+      return Math.round((attended / pastDates.length) * 100);
+    };
+    const attendanceRate = getAttendanceRate();
 
     const getProgramColor = (program) => {
       switch (program) {
@@ -2780,7 +3320,13 @@ const VEXLifetimeAchievementSystem = () => {
           <div className="flex items-center gap-3">
             <div className="text-5xl">{student.avatar}</div>
             <div>
-              <h3 className="text-xl font-bold">{student.name}</h3>
+              <h3 className="font-bold text-lg">{student.name}</h3>
+              {attendanceRate !== null && (
+                <div className="text-sm text-gray-600 flex items-center gap-1">
+                  <span>📅</span>
+                  <span>Attendance: {attendanceRate}%</span>
+                </div>
+              )}
               <span
                 className={`text-xs px-2 py-1 rounded-full ${getProgramColor(
                   student.program
@@ -3402,6 +3948,7 @@ const VEXLifetimeAchievementSystem = () => {
       </div>
       {selectedStudent && <StudentDetail />}
       {showSessionManager && <SessionManager />}
+      {showAttendanceManager && <AttendanceManager />}
       {showStudentManager && <StudentManager />}
       {showAchievementManager && <AchievementManager />}
       {showBulkAward && <BulkAchievementAward />}
