@@ -2920,6 +2920,277 @@ const VEXLifetimeAchievementSystem = () => {
     );
   };
 
+  // Attendance Manager Component
+  const AttendanceManager = () => {
+    const [selectedDate, setSelectedDate] = useState(
+      new Date().toISOString().split("T")[0]
+    );
+    const currentSessionObj = sessions.find((s) => s.name === currentSession);
+
+    // Get students enrolled in current session
+    const enrolledStudents = students.filter(
+      (s) =>
+        s.enrolledSessions?.includes(currentSession) ||
+        s.sessionsAttended?.includes(currentSession)
+    );
+
+    // Check if selected date is a class date
+    const isClassDate = currentSessionObj?.classDates?.includes(selectedDate);
+
+    // Get or initialize attendance for this session and date
+    const getAttendanceStatus = (studentId) => {
+      return (
+        attendance[currentSession]?.[selectedDate]?.[studentId] || "unmarked"
+      );
+    };
+
+    const updateAttendance = (studentId, status) => {
+      setAttendance((prev) => ({
+        ...prev,
+        [currentSession]: {
+          ...prev[currentSession],
+          [selectedDate]: {
+            ...prev[currentSession]?.[selectedDate],
+            [studentId]: status,
+          },
+        },
+      }));
+    };
+
+    const markAllPresent = () => {
+      const newDateAttendance = {};
+      enrolledStudents.forEach((student) => {
+        newDateAttendance[student.id] = "present";
+      });
+
+      setAttendance((prev) => ({
+        ...prev,
+        [currentSession]: {
+          ...prev[currentSession],
+          [selectedDate]: newDateAttendance,
+        },
+      }));
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold">
+              📅 Attendance - {currentSession}
+            </h2>
+            <button
+              onClick={() => setShowAttendanceManager(false)}
+              className="text-2xl hover:text-gray-600"
+            >
+              ×
+            </button>
+          </div>
+
+          {!currentSessionObj ? (
+            <p className="text-gray-600">Please select a session first.</p>
+          ) : (
+            <>
+              {/* Date Selection */}
+              <div className="mb-6 p-4 bg-blue-50 rounded-lg">
+                <div className="flex items-center gap-4">
+                  <div>
+                    <label className="text-sm font-semibold text-gray-700">
+                      Select Date:
+                    </label>
+                    <input
+                      type="date"
+                      value={selectedDate}
+                      onChange={(e) => setSelectedDate(e.target.value)}
+                      className="ml-2 px-3 py-2 border rounded"
+                    />
+                  </div>
+                  {isClassDate ? (
+                    <span className="text-green-600 font-semibold">
+                      ✓ Scheduled Class
+                    </span>
+                  ) : (
+                    <span className="text-gray-500">
+                      Not a scheduled class date
+                    </span>
+                  )}
+                </div>
+
+                {/* Quick Jump to Class Dates */}
+                {currentSessionObj.classDates &&
+                  currentSessionObj.classDates.length > 0 && (
+                    <div className="mt-3">
+                      <p className="text-sm text-gray-600 mb-2">
+                        Quick jump to class:
+                      </p>
+                      <div className="flex gap-2 flex-wrap">
+                        {currentSessionObj.classDates
+                          .slice(0, 7)
+                          .map((date, index) => (
+                            <button
+                              key={index}
+                              onClick={() => setSelectedDate(date)}
+                              className={`px-3 py-1 text-sm rounded ${
+                                date === selectedDate
+                                  ? "bg-blue-500 text-white"
+                                  : "bg-gray-200 hover:bg-gray-300"
+                              }`}
+                            >
+                              {new Date(date + "T12:00:00").toLocaleDateString(
+                                "en-US",
+                                {
+                                  month: "short",
+                                  day: "numeric",
+                                }
+                              )}
+                            </button>
+                          ))}
+                        {currentSessionObj.classDates.length > 7 && (
+                          <span className="text-sm text-gray-500 py-1">
+                            +{currentSessionObj.classDates.length - 7} more
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+              </div>
+
+              {/* Attendance Actions */}
+              <div className="mb-4 flex justify-between items-center">
+                <h3 className="font-bold">
+                  Students ({enrolledStudents.length})
+                </h3>
+                <button
+                  onClick={markAllPresent}
+                  className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+                >
+                  Mark All Present
+                </button>
+              </div>
+
+              {/* Student Attendance List */}
+              <div className="space-y-2">
+                {enrolledStudents.length === 0 ? (
+                  <p className="text-gray-500 text-center py-8">
+                    No students enrolled in this session.
+                  </p>
+                ) : (
+                  enrolledStudents.map((student) => {
+                    const status = getAttendanceStatus(student.id);
+                    return (
+                      <div
+                        key={student.id}
+                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl">{student.avatar}</span>
+                          <div>
+                            <div className="font-semibold">{student.name}</div>
+                            <div className="text-sm text-gray-600">
+                              {student.program}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() =>
+                              updateAttendance(student.id, "present")
+                            }
+                            className={`px-4 py-2 rounded ${
+                              status === "present"
+                                ? "bg-green-500 text-white"
+                                : "bg-gray-200 hover:bg-gray-300"
+                            }`}
+                          >
+                            Present
+                          </button>
+                          <button
+                            onClick={() =>
+                              updateAttendance(student.id, "absent")
+                            }
+                            className={`px-4 py-2 rounded ${
+                              status === "absent"
+                                ? "bg-red-500 text-white"
+                                : "bg-gray-200 hover:bg-gray-300"
+                            }`}
+                          >
+                            Absent
+                          </button>
+                          <button
+                            onClick={() => updateAttendance(student.id, "late")}
+                            className={`px-4 py-2 rounded ${
+                              status === "late"
+                                ? "bg-yellow-500 text-white"
+                                : "bg-gray-200 hover:bg-gray-300"
+                            }`}
+                          >
+                            Late
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Attendance Summary */}
+              {enrolledStudents.length > 0 && (
+                <div className="mt-6 p-4 bg-gray-100 rounded-lg">
+                  <h4 className="font-semibold mb-2">
+                    Summary for{" "}
+                    {new Date(selectedDate + "T12:00:00").toLocaleDateString()}:
+                  </h4>
+                  <div className="grid grid-cols-4 gap-4 text-center">
+                    <div>
+                      <div className="text-2xl font-bold text-green-600">
+                        {
+                          enrolledStudents.filter(
+                            (s) => getAttendanceStatus(s.id) === "present"
+                          ).length
+                        }
+                      </div>
+                      <div className="text-sm text-gray-600">Present</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-red-600">
+                        {
+                          enrolledStudents.filter(
+                            (s) => getAttendanceStatus(s.id) === "absent"
+                          ).length
+                        }
+                      </div>
+                      <div className="text-sm text-gray-600">Absent</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-yellow-600">
+                        {
+                          enrolledStudents.filter(
+                            (s) => getAttendanceStatus(s.id) === "late"
+                          ).length
+                        }
+                      </div>
+                      <div className="text-sm text-gray-600">Late</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-gray-400">
+                        {
+                          enrolledStudents.filter(
+                            (s) => getAttendanceStatus(s.id) === "unmarked"
+                          ).length
+                        }
+                      </div>
+                      <div className="text-sm text-gray-600">Unmarked</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   // Student Card Component
   const StudentCard = ({ student }) => {
     const lifetimeLevel = getStudentLevel(student.lifetimeXP || 0);
