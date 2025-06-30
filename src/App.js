@@ -197,6 +197,10 @@ const VEXLifetimeAchievementSystem = () => {
   const [sessions, setSessions] = useState([]);
   const [showSessionManager, setShowSessionManager] = useState(false);
 
+  // Attendance tracking state
+  const [attendance, setAttendance] = useState({}); // { sessionId: { date: { studentId: 'present'|'absent'|'late' } } }
+  const [showAttendanceManager, setShowAttendanceManager] = useState(false);
+
   // Helper to migrate old string sessions to new format
   const migrateSessionsToNewFormat = (oldSessions) => {
     if (oldSessions.length === 0) return [];
@@ -278,6 +282,8 @@ const VEXLifetimeAchievementSystem = () => {
     const savedTeams = localStorage.getItem("vexTeams");
     const savedMatches = localStorage.getItem("vexTeamworkMatches");
     const savedSkills = localStorage.getItem("vexSkillsScores");
+    const savedAttendance = localStorage.getItem("vexAttendance");
+    if (savedAttendance) setAttendance(JSON.parse(savedAttendance));
 
     if (savedStudents) setStudents(JSON.parse(savedStudents));
     if (savedAchievements) setAchievements(JSON.parse(savedAchievements));
@@ -328,6 +334,10 @@ const VEXLifetimeAchievementSystem = () => {
     localStorage.setItem("vexSessions", JSON.stringify(sessions));
     localStorage.setItem("vexCurrentSession", currentSession);
   }, [sessions, currentSession]);
+
+  useEffect(() => {
+    localStorage.setItem("vexAttendance", JSON.stringify(attendance));
+  }, [attendance]);
 
   useEffect(() => {
     localStorage.setItem(
@@ -2326,6 +2336,7 @@ const VEXLifetimeAchievementSystem = () => {
       type: "general",
       startDate: "",
       endDate: "",
+      selectedDays: [],
     });
     const [editingSession, setEditingSession] = useState(null);
     const [showArchived, setShowArchived] = useState(false);
@@ -2336,6 +2347,30 @@ const VEXLifetimeAchievementSystem = () => {
     const archivedSessions = sessions
       .filter((s) => !s.isActive)
       .sort((a, b) => a.order - b.order);
+
+    // Helper function to generate class dates based on selected days
+    const generateClassDates = (startDate, endDate, selectedDays) => {
+      const dates = [];
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+
+      // Iterate through each day in the range
+      for (
+        let date = new Date(start);
+        date <= end;
+        date.setDate(date.getDate() + 1)
+      ) {
+        const dayName = date
+          .toLocaleDateString("en-US", { weekday: "long" })
+          .toLowerCase();
+
+        if (selectedDays.includes(dayName)) {
+          dates.push(new Date(date).toISOString());
+        }
+      }
+
+      return dates;
+    };
 
     const addSession = () => {
       if (!newSession.name) return;
@@ -2353,6 +2388,17 @@ const VEXLifetimeAchievementSystem = () => {
         isActive: true,
         order: sessions.length,
         createdAt: new Date().toISOString(),
+        // Scheduling fields
+        scheduleType: newSession.selectedDays.length > 0 ? "weekly" : "custom",
+        selectedDays: newSession.selectedDays,
+        classDates:
+          newSession.selectedDays.length > 0
+            ? generateClassDates(
+                newSession.startDate,
+                newSession.endDate,
+                newSession.selectedDays
+              )
+            : [],
       };
 
       setSessions([...sessions, session]);
@@ -2371,6 +2417,7 @@ const VEXLifetimeAchievementSystem = () => {
         type: "general",
         startDate: "",
         endDate: "",
+        selectedDays: [],
       });
     };
 
@@ -2529,6 +2576,50 @@ const VEXLifetimeAchievementSystem = () => {
                   className="w-full px-3 py-2 border rounded"
                 />
               </div>
+              {/* Day Selection - Add this new section */}
+              {newSession.startDate && newSession.endDate && (
+                <div className="mt-3">
+                  <label className="text-sm text-gray-600 mb-2 block">
+                    Select Days
+                  </label>
+                  <div className="flex gap-2 flex-wrap">
+                    {[
+                      "Monday",
+                      "Tuesday",
+                      "Wednesday",
+                      "Thursday",
+                      "Friday",
+                      "Saturday",
+                      "Sunday",
+                    ].map((day) => (
+                      <button
+                        key={day}
+                        type="button"
+                        onClick={() => {
+                          const dayLower = day.toLowerCase();
+                          setNewSession({
+                            ...newSession,
+                            selectedDays: newSession.selectedDays.includes(
+                              dayLower
+                            )
+                              ? newSession.selectedDays.filter(
+                                  (d) => d !== dayLower
+                                )
+                              : [...newSession.selectedDays, dayLower],
+                          });
+                        }}
+                        className={`px-3 py-1 rounded ${
+                          newSession.selectedDays.includes(day.toLowerCase())
+                            ? "bg-blue-500 text-white"
+                            : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                        }`}
+                      >
+                        {day.slice(0, 3)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="flex items-end">
                 <button
                   onClick={addSession}
