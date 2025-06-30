@@ -199,6 +199,7 @@ const VEXLifetimeAchievementSystem = () => {
 
   // Attendance tracking state
   const [attendance, setAttendance] = useState({}); // { sessionId: { date: { studentId: 'present'|'absent'|'late' } } }
+  const [attendanceSelectedDate, setAttendanceSelectedDate] = useState(null);
   const [showAttendanceManager, setShowAttendanceManager] = useState(false);
 
   // Helper to migrate old string sessions to new format
@@ -2928,10 +2929,32 @@ const VEXLifetimeAchievementSystem = () => {
 
   // Attendance Manager Component
   const AttendanceManager = () => {
-    const [selectedDate, setSelectedDate] = useState(
-      new Date().toISOString().split("T")[0]
-    );
     const currentSessionObj = sessions.find((s) => s.name === currentSession);
+
+    // Initialize with next class date or today
+    const getDefaultDate = () => {
+      const today = new Date().toISOString().split("T")[0];
+      if (currentSessionObj?.classDates?.length > 0) {
+        // Find the next upcoming class date or most recent past date
+        const futureDates = currentSessionObj.classDates.filter(
+          (date) => date >= today
+        );
+        const pastDates = currentSessionObj.classDates.filter(
+          (date) => date < today
+        );
+
+        if (futureDates.length > 0) {
+          return futureDates[0]; // Next upcoming class
+        } else if (pastDates.length > 0) {
+          return pastDates[pastDates.length - 1]; // Most recent past class
+        }
+      }
+      return today;
+    };
+
+    // Use the parent state, or default if not set
+    const selectedDate = attendanceSelectedDate || getDefaultDate();
+    const setSelectedDate = setAttendanceSelectedDate;
 
     // Get students enrolled in current session
     const enrolledStudents = students.filter(
@@ -2986,7 +3009,10 @@ const VEXLifetimeAchievementSystem = () => {
               📅 Attendance - {currentSession}
             </h2>
             <button
-              onClick={() => setShowAttendanceManager(false)}
+              onClick={() => {
+                setShowAttendanceManager(false);
+                setAttendanceSelectedDate(null); // Reset the date
+              }}
               className="text-2xl hover:text-gray-600"
             >
               ×
@@ -3073,6 +3099,16 @@ const VEXLifetimeAchievementSystem = () => {
                   Mark All Present
                 </button>
               </div>
+
+              {/* Warning for non-class dates */}
+              {!isClassDate && enrolledStudents.length > 0 && (
+                <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-sm text-yellow-800">
+                    ⚠️ This is not a scheduled class date. You can still mark
+                    attendance for makeup classes or special circumstances.
+                  </p>
+                </div>
+              )}
 
               {/* Student Attendance List */}
               <div className="space-y-2">
