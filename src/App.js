@@ -193,19 +193,30 @@ const VEXLifetimeAchievementSystem = () => {
     },
   ]);
 
-  const [currentSession, setCurrentSession] = useState("Summer 2025 - Week 3");
-  const [sessions, setSessions] = useState([
-    "Summer 2025 - Week 1",
-    "Summer 2025 - Week 2",
-    "Summer 2025 - Week 3",
-    "Summer 2025 - Week 4",
-    "Summer 2025 - Week 5",
-    "Summer 2025 - Week 6",
-    "Summer 2025 - Week 7",
-    "Fall 2025 - VEX GO",
-    "Fall 2025 - VEX IQ",
-    "Fall 2025 - Competition Team",
-  ]);
+  const [currentSession, setCurrentSession] = useState("");
+  const [sessions, setSessions] = useState([]);
+  const [showSessionManager, setShowSessionManager] = useState(false);
+
+  // Helper to migrate old string sessions to new format
+  const migrateSessionsToNewFormat = (oldSessions) => {
+    if (oldSessions.length === 0) return [];
+
+    // Check if already migrated (first item is an object)
+    if (typeof oldSessions[0] === "object") return oldSessions;
+
+    return oldSessions.map((sessionName, index) => {
+      return {
+        id: `session_${Date.now()}_${index}`,
+        name: sessionName,
+        type: "general", // Default to general, let users set it
+        startDate: null, // Let users add dates
+        endDate: null, // Let users add dates
+        isActive: true,
+        order: index,
+        createdAt: new Date().toISOString(),
+      };
+    });
+  };
 
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [currentView, setCurrentView] = useState("dashboard");
@@ -270,13 +281,39 @@ const VEXLifetimeAchievementSystem = () => {
 
     if (savedStudents) setStudents(JSON.parse(savedStudents));
     if (savedAchievements) setAchievements(JSON.parse(savedAchievements));
-    if (savedSessions) setSessions(JSON.parse(savedSessions));
+    if (savedSessions) {
+      const parsedSessions = JSON.parse(savedSessions);
+      setSessions(migrateSessionsToNewFormat(parsedSessions));
+
+      // If no current session saved, use first active session
+      if (!savedCurrentSession && parsedSessions.length > 0) {
+        const migrated = migrateSessionsToNewFormat(parsedSessions);
+        const firstActive = migrated.find((s) => s.isActive);
+        if (firstActive) {
+          setCurrentSession(firstActive.name);
+        }
+      }
+    }
     if (savedCurrentSession) setCurrentSession(savedCurrentSession);
     if (savedMilestones) setStudentMilestones(JSON.parse(savedMilestones));
     if (savedTeams) setTeams(JSON.parse(savedTeams));
     if (savedMatches) setTeamworkMatches(JSON.parse(savedMatches));
     if (savedSkills) setSkillsScores(JSON.parse(savedSkills));
   }, []);
+
+  // Validate current session
+  useEffect(() => {
+    if (
+      sessions.length > 0 &&
+      !sessions.some((s) => s.name === currentSession)
+    ) {
+      // Current session doesn't exist, switch to first active session
+      const firstActiveSession = sessions.find((s) => s.isActive);
+      if (firstActiveSession) {
+        setCurrentSession(firstActiveSession.name);
+      }
+    }
+  }, [sessions, currentSession]);
 
   // Save data whenever it changes
   useEffect(() => {
@@ -332,33 +369,32 @@ const VEXLifetimeAchievementSystem = () => {
   };
 
   // Determine session category
-  const getSessionCategory = (sessionName) => {
-    if (sessionName.includes("Summer")) return "summer";
-    if (sessionName.includes("GO")) return "school-go";
-    if (sessionName.includes("IQ")) return "school-iq";
-    if (sessionName.includes("Competition")) return "competition";
+  // TODO: Make categories customizable in future version
+  const getSessionCategory = (session) => {
+    // If we have a session object with a type, use it
+    if (session && typeof session === "object" && session.type) {
+      return session.type;
+    }
+
+    // Fallback to name-based detection for backward compatibility
+    const name = typeof session === "string" ? session : session?.name || "";
+
+    if (name.includes("Summer")) return "summer";
+    if (name.includes("GO")) return "school-go";
+    if (name.includes("IQ")) return "school-iq";
+    if (name.includes("Competition")) return "competition";
     return "general";
   };
 
-  // // Get available achievements for current session
-  // const getAvailableSessionAchievements = (student) => {
-  //   const earnedInSession = student.sessionAchievements?.[currentSession] || [];
-  //   const sessionCategory = getSessionCategory(currentSession);
-
-  //   return achievements.filter(
-  //     (a) =>
-  //       a.type === "session" &&
-  //       a.category === sessionCategory &&
-  //       !earnedInSession.includes(a.id)
-  //   );
-  // };
-
-  // DEBUG VERSION - Add console.logs to identify the issue
+  // Get current session object
+  const getCurrentSessionObject = () => {
+    return sessions.find((s) => s.name === currentSession) || null;
+  };
 
   // Get available achievements for current session - WITH DEBUG
   const getAvailableSessionAchievements = (student) => {
     const earnedInSession = student.sessionAchievements?.[currentSession] || [];
-    const sessionCategory = getSessionCategory(currentSession);
+    const sessionCategory = getSessionCategory(getCurrentSessionObject());
 
     const available = achievements.filter(
       (a) =>
@@ -405,83 +441,6 @@ const VEXLifetimeAchievementSystem = () => {
       })
     );
   };
-
-  // // Award achievement - Simple idempotent version
-  // const awardAchievement = (studentId, achievementId) => {
-  //   const achievement = achievements.find((a) => a.id === achievementId);
-  //   if (!achievement) return;
-
-  //   // Check BEFORE state update to show alerts
-  //   const student = students.find((s) => s.id === studentId);
-  //   if (!student) return;
-
-  //   if (
-  //     achievement.type === "lifetime" &&
-  //     student.achievements?.includes(achievementId)
-  //   ) {
-  //     alert(`${student.name} already earned "${achievement.name}"!`);
-  //     return;
-  //   }
-
-  //   if (achievement.type === "session") {
-  //     const currentSessionAchievements =
-  //       student.sessionAchievements?.[currentSession] || [];
-  //     if (currentSessionAchievements.includes(achievementId)) {
-  //       alert(
-  //         `${student.name} already earned "${achievement.name}" this session!`
-  //       );
-  //       return;
-  //     }
-  //   }
-
-  //   // Now do the state update
-  //   setStudents((prev) => {
-  //     return prev.map((s) => {
-  //       if (s.id !== studentId) return s;
-
-  //       const updatedStudent = { ...s };
-
-  //       if (achievement.type === "lifetime") {
-  //         // Check again to be idempotent
-  //         if (!s.achievements?.includes(achievementId)) {
-  //           updatedStudent.achievements = [
-  //             ...(s.achievements || []),
-  //             achievementId,
-  //           ];
-  //           updatedStudent.lifetimeXP = (s.lifetimeXP || 0) + achievement.xp;
-  //         }
-  //       } else {
-  //         // Session achievement
-  //         const existingAchievements =
-  //           s.sessionAchievements?.[currentSession] || [];
-
-  //         if (!existingAchievements.includes(achievementId)) {
-  //           // Initialize if needed
-  //           if (!updatedStudent.sessionAchievements) {
-  //             updatedStudent.sessionAchievements = {};
-  //           }
-  //           updatedStudent.sessionAchievements[currentSession] = [
-  //             ...existingAchievements,
-  //             achievementId,
-  //           ];
-
-  //           if (!updatedStudent.sessionXP) {
-  //             updatedStudent.sessionXP = {};
-  //           }
-  //           updatedStudent.sessionXP[currentSession] =
-  //             (s.sessionXP?.[currentSession] || 0) + achievement.xp;
-
-  //           // Lifetime XP
-  //           const lifetimeContribution = Math.floor(achievement.xp * 0.3);
-  //           updatedStudent.lifetimeXP =
-  //             (s.lifetimeXP || 0) + lifetimeContribution;
-  //         }
-  //       }
-
-  //       return updatedStudent;
-  //     });
-  //   });
-  // };
 
   // Award achievement - SIMPLE FINAL VERSION
   const awardAchievement = (studentId, achievementId) => {
@@ -645,6 +604,7 @@ const VEXLifetimeAchievementSystem = () => {
       avatar: "🤖",
       joinDate: new Date().toISOString(),
       sessionsAttended: [currentSession],
+      enrolledSessions: [currentSession], // Add this line - auto-enroll in current session
     };
     setStudents([...students, newStudent]);
   };
@@ -693,6 +653,7 @@ const VEXLifetimeAchievementSystem = () => {
   const StudentManager = () => {
     const [newStudentName, setNewStudentName] = useState("");
     const [newStudentProgram, setNewStudentProgram] = useState("VEX IQ");
+    const [searchFilter, setSearchFilter] = useState("");
 
     const handleAddStudent = () => {
       if (newStudentName.trim()) {
@@ -751,30 +712,146 @@ const VEXLifetimeAchievementSystem = () => {
             </div>
           </div>
 
+          {/* Current Session Info */}
+          <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+            <p className="text-sm text-blue-800">
+              <strong>Current Session:</strong>{" "}
+              {currentSession || "No session selected"}
+            </p>
+            <p className="text-xs text-blue-600 mt-1">
+              Use the Enroll/Unenroll buttons to manage student enrollment in
+              this session.
+            </p>
+          </div>
+          {/* Search Filter */}
+          <div className="mb-4">
+            <input
+              type="text"
+              placeholder="🔍 Search students by name..."
+              value={searchFilter}
+              onChange={(e) => setSearchFilter(e.target.value)}
+              className="w-full px-4 py-2 border rounded-lg"
+            />
+          </div>
+
+          <div className="mb-2 text-sm text-gray-600">
+            Showing{" "}
+            {
+              students.filter((s) =>
+                s.name.toLowerCase().includes(searchFilter.toLowerCase())
+              ).length
+            }{" "}
+            of {students.length} students
+          </div>
+
           <div className="space-y-2">
-            {students.map((student) => (
-              <div
-                key={student.id}
-                className="flex items-center justify-between p-3 bg-gray-50 rounded"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">{student.avatar}</span>
-                  <div>
-                    <div className="font-semibold">{student.name}</div>
-                    <div className="text-sm text-gray-600">
-                      {student.program} • Lifetime: {student.lifetimeXP} XP •
-                      Session: {getSessionXP(student)} XP
+            {students
+              .filter((student) =>
+                student.name.toLowerCase().includes(searchFilter.toLowerCase())
+              )
+              .map((student) => (
+                <div
+                  key={student.id}
+                  className="flex items-center justify-between p-3 bg-gray-50 rounded"
+                >
+                  <div className="flex items-center gap-3 flex-1">
+                    <span className="text-2xl">{student.avatar}</span>
+                    <div className="flex-1">
+                      <div className="font-semibold">{student.name}</div>
+                      <div className="text-sm text-gray-600">
+                        {student.program} • Lifetime: {student.lifetimeXP} XP •
+                        Session: {getSessionXP(student)} XP
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        Enrolled in:{" "}
+                        {(
+                          student.enrolledSessions ||
+                          student.sessionsAttended ||
+                          []
+                        )
+                          .filter((session) =>
+                            sessions.some(
+                              (s) => s.name === session && s.isActive
+                            )
+                          )
+                          .join(", ") || "No sessions"}
+                      </div>
                     </div>
                   </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        const isEnrolled =
+                          student.enrolledSessions?.includes(currentSession) ||
+                          student.sessionsAttended?.includes(currentSession);
+
+                        if (isEnrolled) {
+                          // Unenroll
+                          setStudents(
+                            students.map((s) =>
+                              s.id === student.id
+                                ? {
+                                    ...s,
+                                    enrolledSessions: (
+                                      s.enrolledSessions ||
+                                      s.sessionsAttended ||
+                                      []
+                                    ).filter(
+                                      (session) => session !== currentSession
+                                    ),
+                                    sessionsAttended: (
+                                      s.sessionsAttended || []
+                                    ).filter(
+                                      (session) => session !== currentSession
+                                    ),
+                                  }
+                                : s
+                            )
+                          );
+                        } else {
+                          // Enroll
+                          setStudents(
+                            students.map((s) =>
+                              s.id === student.id
+                                ? {
+                                    ...s,
+                                    enrolledSessions: [
+                                      ...(s.enrolledSessions ||
+                                        s.sessionsAttended ||
+                                        []),
+                                      currentSession,
+                                    ],
+                                    sessionsAttended: [
+                                      ...(s.sessionsAttended || []),
+                                      currentSession,
+                                    ],
+                                  }
+                                : s
+                            )
+                          );
+                        }
+                      }}
+                      className={`px-3 py-1 rounded text-white ${
+                        student.enrolledSessions?.includes(currentSession) ||
+                        student.sessionsAttended?.includes(currentSession)
+                          ? "bg-gray-500 hover:bg-gray-600"
+                          : "bg-green-500 hover:bg-green-600"
+                      }`}
+                    >
+                      {student.enrolledSessions?.includes(currentSession) ||
+                      student.sessionsAttended?.includes(currentSession)
+                        ? "Unenroll"
+                        : "Enroll"}
+                    </button>
+                    <button
+                      onClick={() => removeStudent(student.id)}
+                      className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
+                    >
+                      Remove
+                    </button>
+                  </div>
                 </div>
-                <button
-                  onClick={() => removeStudent(student.id)}
-                  className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
-                >
-                  Remove
-                </button>
-              </div>
-            ))}
+              ))}
           </div>
         </div>
       </div>
@@ -1924,7 +2001,7 @@ const VEXLifetimeAchievementSystem = () => {
       skipped: 0,
     });
 
-    const sessionCategory = getSessionCategory(currentSession);
+    const sessionCategory = getSessionCategory(getCurrentSessionObject());
     const availableAchievements = achievements.filter(
       (a) => a.type === "session" && a.category === sessionCategory
     );
@@ -2237,6 +2314,431 @@ const VEXLifetimeAchievementSystem = () => {
               {bulkSelectedStudents.length !== 1 ? "s" : ""}
             </button>
           </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Session Manager Modal
+  const SessionManager = () => {
+    const [newSession, setNewSession] = useState({
+      name: "",
+      type: "general",
+      startDate: "",
+      endDate: "",
+    });
+    const [editingSession, setEditingSession] = useState(null);
+    const [showArchived, setShowArchived] = useState(false);
+
+    const activeSessions = sessions
+      .filter((s) => s.isActive)
+      .sort((a, b) => a.order - b.order);
+    const archivedSessions = sessions
+      .filter((s) => !s.isActive)
+      .sort((a, b) => a.order - b.order);
+
+    const addSession = () => {
+      if (!newSession.name) return;
+
+      const session = {
+        id: `session_${Date.now()}`,
+        name: newSession.name,
+        type: newSession.type,
+        startDate: newSession.startDate
+          ? new Date(newSession.startDate + "T00:00:00").toISOString()
+          : null,
+        endDate: newSession.endDate
+          ? new Date(newSession.endDate + "T00:00:00").toISOString()
+          : null,
+        isActive: true,
+        order: sessions.length,
+        createdAt: new Date().toISOString(),
+      };
+
+      setSessions([...sessions, session]);
+
+      // If this is the first session OR current session doesn't exist, set it as current
+      if (
+        sessions.length === 0 ||
+        !sessions.some((s) => s.name === currentSession)
+      ) {
+        setCurrentSession(session.name);
+      }
+
+      // Reset form
+      setNewSession({
+        name: "",
+        type: "general",
+        startDate: "",
+        endDate: "",
+      });
+    };
+
+    const updateSession = (sessionId, updates) => {
+      setSessions(
+        sessions.map((s) => (s.id === sessionId ? { ...s, ...updates } : s))
+      );
+
+      // Update currentSession if the name changed
+      if (
+        updates.name &&
+        currentSession === sessions.find((s) => s.id === sessionId)?.name
+      ) {
+        setCurrentSession(updates.name);
+      }
+
+      setEditingSession(null);
+    };
+
+    const archiveSession = (sessionId) => {
+      const session = sessions.find((s) => s.id === sessionId);
+      if (session && session.name === currentSession) {
+        alert(
+          "Cannot archive the current session. Please switch to another session first."
+        );
+        return;
+      }
+
+      setSessions(
+        sessions.map((s) =>
+          s.id === sessionId ? { ...s, isActive: false } : s
+        )
+      );
+    };
+
+    const unarchiveSession = (sessionId) => {
+      setSessions(
+        sessions.map((s) => (s.id === sessionId ? { ...s, isActive: true } : s))
+      );
+    };
+
+    const moveSession = (sessionId, direction) => {
+      const sessionList = showArchived ? archivedSessions : activeSessions;
+      const index = sessionList.findIndex((s) => s.id === sessionId);
+      if (
+        (direction === "up" && index === 0) ||
+        (direction === "down" && index === sessionList.length - 1)
+      )
+        return;
+
+      const newOrder = direction === "up" ? index - 1 : index + 1;
+      const otherSession = sessionList[newOrder];
+
+      setSessions(
+        sessions.map((s) => {
+          if (s.id === sessionId) return { ...s, order: otherSession.order };
+          if (s.id === otherSession.id)
+            return { ...s, order: sessionList[index].order };
+          return s;
+        })
+      );
+    };
+
+    const sessionTypeInfo = {
+      summer: {
+        label: "Summer Camp",
+        color: "bg-yellow-100 text-yellow-800",
+        icon: "☀️",
+      },
+      "school-go": {
+        label: "School - VEX GO",
+        color: "bg-green-100 text-green-800",
+        icon: "🟢",
+      },
+      "school-iq": {
+        label: "School - VEX IQ",
+        color: "bg-blue-100 text-blue-800",
+        icon: "🔵",
+      },
+      competition: {
+        label: "Competition",
+        color: "bg-purple-100 text-purple-800",
+        icon: "🏆",
+      },
+      general: {
+        label: "General",
+        color: "bg-gray-100 text-gray-800",
+        icon: "📅",
+      },
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold">📅 Manage Sessions</h2>
+            <button
+              onClick={() => setShowSessionManager(false)}
+              className="text-2xl hover:text-gray-600"
+            >
+              ×
+            </button>
+          </div>
+
+          {/* Add New Session */}
+          <div className="mb-6 p-4 bg-green-50 rounded-lg">
+            <h3 className="font-bold mb-3">Add New Session</h3>
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <input
+                type="text"
+                placeholder="Session Name"
+                value={newSession.name}
+                onChange={(e) =>
+                  setNewSession({ ...newSession, name: e.target.value })
+                }
+                className="px-3 py-2 border rounded"
+              />
+              <select
+                value={newSession.type}
+                onChange={(e) =>
+                  setNewSession({ ...newSession, type: e.target.value })
+                }
+                className="px-3 py-2 border rounded"
+              >
+                <option value="general">General</option>
+                <option value="summer">Summer Camp</option>
+                <option value="school-go">School - VEX GO</option>
+                <option value="school-iq">School - VEX IQ</option>
+                <option value="competition">Competition</option>
+              </select>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="text-sm text-gray-600">
+                  Start Date (optional)
+                </label>
+                <input
+                  type="date"
+                  value={newSession.startDate}
+                  onChange={(e) =>
+                    setNewSession({ ...newSession, startDate: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border rounded"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-gray-600">
+                  End Date (optional)
+                </label>
+                <input
+                  type="date"
+                  value={newSession.endDate}
+                  onChange={(e) =>
+                    setNewSession({ ...newSession, endDate: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border rounded"
+                />
+              </div>
+              <div className="flex items-end">
+                <button
+                  onClick={addSession}
+                  disabled={!newSession.name}
+                  className="w-full px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:bg-gray-300"
+                >
+                  Add Session
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Active Sessions */}
+          <div className="mb-6">
+            <h3 className="font-bold mb-3">
+              Active Sessions ({activeSessions.length})
+            </h3>
+            {activeSessions.length === 0 ? (
+              <p className="text-gray-500 italic">
+                No active sessions. Add one above!
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {activeSessions.map((session, index) => (
+                  <div
+                    key={session.id}
+                    className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
+                  >
+                    {editingSession === session.id ? (
+                      <div className="flex-1 flex gap-2">
+                        <input
+                          type="text"
+                          value={session.name}
+                          onChange={(e) =>
+                            setSessions(
+                              sessions.map((s) =>
+                                s.id === session.id
+                                  ? { ...s, name: e.target.value }
+                                  : s
+                              )
+                            )
+                          }
+                          className="flex-1 px-2 py-1 border rounded"
+                          autoFocus
+                        />
+                        <select
+                          value={session.type}
+                          onChange={(e) =>
+                            setSessions(
+                              sessions.map((s) =>
+                                s.id === session.id
+                                  ? { ...s, type: e.target.value }
+                                  : s
+                              )
+                            )
+                          }
+                          className="px-2 py-1 border rounded"
+                        >
+                          <option value="general">General</option>
+                          <option value="summer">Summer</option>
+                          <option value="school-go">VEX GO</option>
+                          <option value="school-iq">VEX IQ</option>
+                          <option value="competition">Competition</option>
+                        </select>
+                        <button
+                          onClick={() => {
+                            const sessionToUpdate = sessions.find(
+                              (s) => s.id === session.id
+                            );
+                            updateSession(session.id, {
+                              name: sessionToUpdate.name,
+                              type: sessionToUpdate.type,
+                            });
+                          }}
+                          className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
+                        >
+                          Save
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => moveSession(session.id, "up")}
+                            disabled={index === 0}
+                            className="text-gray-400 hover:text-gray-600 disabled:opacity-30"
+                          >
+                            ↑
+                          </button>
+                          <button
+                            onClick={() => moveSession(session.id, "down")}
+                            disabled={index === activeSessions.length - 1}
+                            className="text-gray-400 hover:text-gray-600 disabled:opacity-30"
+                          >
+                            ↓
+                          </button>
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">
+                              {sessionTypeInfo[session.type]?.icon}
+                            </span>
+                            <span className="font-semibold">
+                              {session.name}
+                            </span>
+                            {session.name === currentSession && (
+                              <span className="px-2 py-1 bg-blue-500 text-white text-xs rounded">
+                                Current
+                              </span>
+                            )}
+                            {/* Add enrolled count */}
+                            <span className="text-sm text-gray-500">
+                              (
+                              {
+                                students.filter(
+                                  (s) =>
+                                    s.enrolledSessions?.includes(
+                                      session.name
+                                    ) ||
+                                    s.sessionsAttended?.includes(session.name)
+                                ).length
+                              }{" "}
+                              students)
+                            </span>
+                          </div>
+                          <div className="text-sm text-gray-600 mt-1">
+                            <span
+                              className={`px-2 py-1 rounded text-xs ${
+                                sessionTypeInfo[session.type]?.color
+                              }`}
+                            >
+                              {sessionTypeInfo[session.type]?.label}
+                            </span>
+                            {session.startDate && (
+                              <span className="ml-2">
+                                {new Date(
+                                  session.startDate
+                                ).toLocaleDateString()}
+                                {""}-
+                                {session.endDate
+                                  ? new Date(
+                                      session.endDate
+                                    ).toLocaleDateString()
+                                  : "Ongoing"}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setEditingSession(session.id)}
+                            className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => archiveSession(session.id)}
+                            className="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600"
+                          >
+                            Archive
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Archived Sessions */}
+          {archivedSessions.length > 0 && (
+            <div>
+              <button
+                onClick={() => setShowArchived(!showArchived)}
+                className="flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-3"
+              >
+                <span>{showArchived ? "▼" : "▶"}</span>
+                <span className="font-semibold">
+                  Archived Sessions ({archivedSessions.length})
+                </span>
+              </button>
+
+              {showArchived && (
+                <div className="space-y-2">
+                  {archivedSessions.map((session) => (
+                    <div
+                      key={session.id}
+                      className="flex items-center gap-3 p-3 bg-gray-100 rounded-lg opacity-75"
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">
+                            {sessionTypeInfo[session.type]?.icon}
+                          </span>
+                          <span className="font-semibold">{session.name}</span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => unarchiveSession(session.id)}
+                        className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
+                      >
+                        Restore
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -2574,7 +3076,7 @@ const VEXLifetimeAchievementSystem = () => {
                 .filter(
                   (a) =>
                     a.type === "session" &&
-                    getSessionCategory(currentSession) === a.category
+                    getSessionCategory(getCurrentSessionObject()) === a.category
                 )
                 .map((achievement) => {
                   const currentSessionAchievements =
@@ -2701,11 +3203,14 @@ const VEXLifetimeAchievementSystem = () => {
                 onChange={(e) => setCurrentSession(e.target.value)}
                 className="px-3 py-2 rounded bg-blue-700 text-white"
               >
-                {sessions.map((session) => (
-                  <option key={session} value={session}>
-                    {session}
-                  </option>
-                ))}
+                {sessions
+                  .filter((s) => s.isActive)
+                  .sort((a, b) => a.order - b.order)
+                  .map((session) => (
+                    <option key={session.id} value={session.name}>
+                      {session.name}
+                    </option>
+                  ))}
               </select>
               <div className="flex gap-2">
                 <button
@@ -2733,6 +3238,12 @@ const VEXLifetimeAchievementSystem = () => {
           </div>
 
           <div className="flex gap-2 mt-3 flex-wrap">
+            <button
+              onClick={() => setShowSessionManager(true)}
+              className="px-3 py-1 bg-blue-700 rounded hover:bg-blue-800"
+            >
+              📅 Manage Sessions
+            </button>
             <button
               onClick={() => setShowStudentManager(true)}
               className="px-3 py-1 bg-blue-700 rounded hover:bg-blue-800"
@@ -2765,23 +3276,45 @@ const VEXLifetimeAchievementSystem = () => {
         {currentView === "dashboard" ? (
           <div>
             <h2 className="text-2xl font-bold mb-4">
-              Student Progress - {currentSession}
+              {sessions.length > 0 && currentSession
+                ? `Student Progress - ${currentSession}`
+                : "Student Progress - No Session Selected"}
             </h2>
-            {students.length === 0 ? (
+            {students.filter(
+              (s) =>
+                s.enrolledSessions?.includes(currentSession) ||
+                s.sessionsAttended?.includes(currentSession)
+            ).length === 0 ? (
               <div className="text-center py-12">
-                <p className="text-xl text-gray-600 mb-4">No students yet!</p>
+                <p className="text-xl text-gray-600 mb-4">
+                  {sessions.length === 0
+                    ? "No sessions created yet!"
+                    : "No students enrolled in this session!"}
+                </p>
                 <button
-                  onClick={() => setShowStudentManager(true)}
+                  onClick={() =>
+                    sessions.length === 0
+                      ? setShowSessionManager(true)
+                      : setShowStudentManager(true)
+                  }
                   className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
                 >
-                  Add Your First Student
+                  {sessions.length === 0
+                    ? "Create Your First Session"
+                    : "Add Students to Session"}
                 </button>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {students.map((student) => (
-                  <StudentCard key={student.id} student={student} />
-                ))}
+                {students
+                  .filter(
+                    (student) =>
+                      student.enrolledSessions?.includes(currentSession) ||
+                      student.sessionsAttended?.includes(currentSession)
+                  )
+                  .map((student) => (
+                    <StudentCard key={student.id} student={student} />
+                  ))}
               </div>
             )}
           </div>
@@ -2868,6 +3401,7 @@ const VEXLifetimeAchievementSystem = () => {
         )}
       </div>
       {selectedStudent && <StudentDetail />}
+      {showSessionManager && <SessionManager />}
       {showStudentManager && <StudentManager />}
       {showAchievementManager && <AchievementManager />}
       {showBulkAward && <BulkAchievementAward />}
