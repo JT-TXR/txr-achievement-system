@@ -4551,6 +4551,14 @@ const VEXLifetimeAchievementSystem = () => {
           onClose={() => setShowTournamentView(false)}
         />
       )}
+      {showAttendanceReport && (
+        <AttendanceReport
+          sessions={sessions}
+          students={students}
+          attendance={attendance}
+          onClose={() => setShowAttendanceReport(false)}
+        />
+      )}
     </div>
   );
 };
