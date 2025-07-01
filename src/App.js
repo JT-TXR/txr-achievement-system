@@ -3246,6 +3246,564 @@ const VEXLifetimeAchievementSystem = () => {
     );
   };
 
+  // Add this component before your VEXLifetimeAchievementSystem component
+
+  const AttendanceReport = ({
+    sessions = [],
+    students = [],
+    attendance = {},
+    onClose,
+  }) => {
+    // Get date 30 days ago and today
+    const today = new Date();
+    const thirtyDaysAgo = new Date(today);
+    thirtyDaysAgo.setDate(today.getDate() - 30);
+
+    const [dateRange, setDateRange] = useState({
+      start: thirtyDaysAgo.toISOString().split("T")[0],
+      end: today.toISOString().split("T")[0],
+    });
+    const [selectedSession, setSelectedSession] = useState("all");
+    const [showDetails, setShowDetails] = useState({});
+    const [viewMode, setViewMode] = useState("table");
+
+    // Get active sessions only
+    const activeSessions = useMemo(() => {
+      if (!sessions || !Array.isArray(sessions)) return [];
+      return sessions
+        .filter((s) => s && s.isActive)
+        .sort((a, b) => (a.order || 0) - (b.order || 0));
+    }, [sessions]);
+
+    // Calculate attendance data
+    const attendanceData = useMemo(() => {
+      const data = [];
+
+      if (!dateRange.start || !dateRange.end) return data;
+
+      const startDate = new Date(dateRange.start);
+      const endDate = new Date(dateRange.end);
+
+      // Get all relevant sessions
+      const relevantSessions =
+        selectedSession === "all"
+          ? activeSessions
+          : activeSessions.filter((s) => s.name === selectedSession);
+
+      relevantSessions.forEach((session) => {
+        if (
+          !session ||
+          !session.classDates ||
+          !Array.isArray(session.classDates) ||
+          session.classDates.length === 0
+        )
+          return;
+
+        // Filter class dates within range
+        const classesInRange = session.classDates.filter((date) => {
+          if (!date) return false;
+          const classDate = new Date(date);
+          return classDate >= startDate && classDate <= endDate;
+        });
+
+        classesInRange.forEach((date) => {
+          // Get enrolled students for this session
+          const enrolledStudents = students.filter((s) => {
+            if (!s) return false;
+            return (
+              (s.enrolledSessions &&
+                s.enrolledSessions.includes(session.name)) ||
+              (s.sessionsAttended && s.sessionsAttended.includes(session.name))
+            );
+          });
+
+          // Calculate attendance for this date
+          const attendanceRecord = {
+            date,
+            session: session.name || "Unknown Session",
+            sessionType: session.type || "general",
+            totalEnrolled: enrolledStudents.length,
+            present: 0,
+            absent: 0,
+            late: 0,
+            unmarked: 0,
+            attendanceRate: 0,
+            students: [],
+          };
+
+          enrolledStudents.forEach((student) => {
+            const status =
+              attendance?.[session.name]?.[date]?.[student.id] || "unmarked";
+
+            attendanceRecord.students.push({
+              id: student.id,
+              name: student.name || "Unknown Student",
+              program: student.program || "Unknown Program",
+              status,
+            });
+
+            switch (status) {
+              case "present":
+                attendanceRecord.present++;
+                break;
+              case "absent":
+                attendanceRecord.absent++;
+                break;
+              case "late":
+                attendanceRecord.late++;
+                break;
+              default:
+                attendanceRecord.unmarked++;
+            }
+          });
+
+          // Calculate attendance rate (present + late)
+          if (attendanceRecord.totalEnrolled > 0) {
+            attendanceRecord.attendanceRate = Math.round(
+              ((attendanceRecord.present + attendanceRecord.late) /
+                attendanceRecord.totalEnrolled) *
+                100
+            );
+          }
+
+          data.push(attendanceRecord);
+        });
+      });
+
+      // Sort by date
+      return data.sort((a, b) => new Date(b.date) - new Date(a.date));
+    }, [
+      dateRange,
+      selectedSession,
+      sessions,
+      students,
+      attendance,
+      activeSessions,
+    ]);
+
+    // Calculate summary statistics
+    const summaryStats = useMemo(() => {
+      if (!attendanceData || attendanceData.length === 0) {
+        return {
+          averageAttendance: 0,
+          totalClasses: 0,
+          totalStudentDays: 0,
+          bestDay: null,
+          worstDay: null,
+          trend: "stable",
+        };
+      }
+
+      const totalAttendance = attendanceData.reduce(
+        (sum, record) => sum + (record.attendanceRate || 0),
+        0
+      );
+      const averageAttendance = Math.round(
+        totalAttendance / attendanceData.length
+      );
+
+      const totalStudentDays = attendanceData.reduce(
+        (sum, record) => sum + (record.totalEnrolled || 0),
+        0
+      );
+
+      // Find best and worst days
+      const sortedByAttendance = [...attendanceData].sort(
+        (a, b) => (b.attendanceRate || 0) - (a.attendanceRate || 0)
+      );
+      const bestDay = sortedByAttendance[0];
+      const worstDay = sortedByAttendance[sortedByAttendance.length - 1];
+
+      // Calculate trend (compare first half to second half)
+      const midpoint = Math.floor(attendanceData.length / 2);
+      const firstHalf = attendanceData.slice(midpoint);
+      const secondHalf = attendanceData.slice(0, midpoint);
+
+      const firstHalfAvg =
+        firstHalf.length > 0
+          ? firstHalf.reduce((sum, r) => sum + (r.attendanceRate || 0), 0) /
+            firstHalf.length
+          : 0;
+      const secondHalfAvg =
+        secondHalf.length > 0
+          ? secondHalf.reduce((sum, r) => sum + (r.attendanceRate || 0), 0) /
+            secondHalf.length
+          : 0;
+
+      let trend = "stable";
+      if (secondHalfAvg > firstHalfAvg + 5) trend = "improving";
+      else if (secondHalfAvg < firstHalfAvg - 5) trend = "declining";
+
+      return {
+        averageAttendance: isNaN(averageAttendance) ? 0 : averageAttendance,
+        totalClasses: attendanceData.length,
+        totalStudentDays,
+        bestDay,
+        worstDay,
+        trend,
+      };
+    }, [attendanceData]);
+
+    // Get students with poor attendance
+    const studentsWithPoorAttendance = useMemo(() => {
+      if (!attendanceData || attendanceData.length === 0) return [];
+
+      const studentAttendance = {};
+
+      attendanceData.forEach((record) => {
+        if (!record.students || !Array.isArray(record.students)) return;
+
+        record.students.forEach((student) => {
+          if (!student || !student.id) return;
+
+          if (!studentAttendance[student.id]) {
+            studentAttendance[student.id] = {
+              name: student.name || "Unknown",
+              program: student.program || "Unknown",
+              totalClasses: 0,
+              attended: 0,
+              rate: 0,
+            };
+          }
+
+          studentAttendance[student.id].totalClasses++;
+          if (student.status === "present" || student.status === "late") {
+            studentAttendance[student.id].attended++;
+          }
+        });
+      });
+
+      // Calculate rates and filter poor attendance (< 80%)
+      return Object.values(studentAttendance)
+        .map((student) => ({
+          ...student,
+          rate:
+            student.totalClasses > 0
+              ? Math.round((student.attended / student.totalClasses) * 100)
+              : 0,
+        }))
+        .filter((student) => student.rate < 80)
+        .sort((a, b) => a.rate - b.rate);
+    }, [attendanceData]);
+
+    // Toggle details for a specific date
+    const toggleDetails = (index) => {
+      setShowDetails((prev) => ({
+        ...prev,
+        [index]: !prev[index],
+      }));
+    };
+
+    // Export functions
+    const exportToCSV = () => {
+      const headers = [
+        "Date",
+        "Session",
+        "Total Enrolled",
+        "Present",
+        "Absent",
+        "Late",
+        "Unmarked",
+        "Attendance Rate",
+      ];
+      const rows = attendanceData.map((record) => [
+        new Date(record.date).toLocaleDateString(),
+        record.session,
+        record.totalEnrolled,
+        record.present,
+        record.absent,
+        record.late,
+        record.unmarked,
+        `${record.attendanceRate}%`,
+      ]);
+
+      const csvContent = [
+        headers.join(","),
+        ...rows.map((row) => row.join(",")),
+      ].join("\n");
+
+      const blob = new Blob([csvContent], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `attendance-report-${dateRange.start}-to-${dateRange.end}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+
+    const getAttendanceColor = (rate) => {
+      if (rate >= 90) return "text-green-600";
+      if (rate >= 80) return "text-yellow-600";
+      return "text-red-600";
+    };
+
+    const getStatusColor = (status) => {
+      switch (status) {
+        case "present":
+          return "bg-green-100 text-green-800";
+        case "absent":
+          return "bg-red-100 text-red-800";
+        case "late":
+          return "bg-yellow-100 text-yellow-800";
+        default:
+          return "bg-gray-100 text-gray-800";
+      }
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="bg-white rounded-lg shadow-xl p-6 max-w-7xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+          {/* Header */}
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+              📈 Attendance Report
+            </h2>
+            <button onClick={onClose} className="text-2xl hover:text-gray-600">
+              ×
+            </button>
+          </div>
+
+          {/* Filters */}
+          <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Start Date
+                </label>
+                <input
+                  type="date"
+                  value={dateRange.start}
+                  onChange={(e) =>
+                    setDateRange({ ...dateRange, start: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border rounded"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  End Date
+                </label>
+                <input
+                  type="date"
+                  value={dateRange.end}
+                  onChange={(e) =>
+                    setDateRange({ ...dateRange, end: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border rounded"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Session
+                </label>
+                <select
+                  value={selectedSession}
+                  onChange={(e) => setSelectedSession(e.target.value)}
+                  className="w-full px-3 py-2 border rounded"
+                >
+                  <option value="all">All Sessions</option>
+                  {activeSessions.map((session) => (
+                    <option key={session.id} value={session.name}>
+                      {session.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Actions
+                </label>
+                <button
+                  onClick={exportToCSV}
+                  className="w-full px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600 flex items-center justify-center gap-2"
+                >
+                  ⬇ Export CSV
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Summary Statistics */}
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <div className="text-3xl font-bold text-blue-600">
+                {summaryStats.averageAttendance}%
+              </div>
+              <div className="text-sm text-gray-600">Average Attendance</div>
+            </div>
+            <div className="bg-green-50 p-4 rounded-lg">
+              <div className="text-3xl font-bold text-green-600">
+                {summaryStats.totalClasses}
+              </div>
+              <div className="text-sm text-gray-600">Total Classes</div>
+            </div>
+            <div className="bg-purple-50 p-4 rounded-lg">
+              <div className="text-3xl font-bold text-purple-600">
+                {summaryStats.totalStudentDays}
+              </div>
+              <div className="text-sm text-gray-600">Student Days</div>
+            </div>
+            <div className="bg-yellow-50 p-4 rounded-lg">
+              <div className="flex items-center gap-2">
+                {summaryStats.trend === "improving" ? (
+                  <span className="text-2xl">📈</span>
+                ) : summaryStats.trend === "declining" ? (
+                  <span className="text-2xl">📉</span>
+                ) : (
+                  <span className="text-2xl">→</span>
+                )}
+                <span className="text-lg font-semibold capitalize">
+                  {summaryStats.trend}
+                </span>
+              </div>
+              <div className="text-sm text-gray-600">Attendance Trend</div>
+            </div>
+            <div className="bg-red-50 p-4 rounded-lg">
+              <div className="text-3xl font-bold text-red-600">
+                {studentsWithPoorAttendance.length}
+              </div>
+              <div className="text-sm text-gray-600">Students Below 80%</div>
+            </div>
+          </div>
+
+          {/* Poor Attendance Alert */}
+          {studentsWithPoorAttendance.length > 0 && (
+            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xl">⚠️</span>
+                <h3 className="font-semibold text-red-800">
+                  Students Requiring Attention
+                </h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                {studentsWithPoorAttendance.map((student) => (
+                  <div
+                    key={student.name}
+                    className="flex justify-between items-center p-2 bg-white rounded"
+                  >
+                    <span className="font-medium">{student.name}</span>
+                    <span
+                      className={`font-bold ${getAttendanceColor(
+                        student.rate
+                      )}`}
+                    >
+                      {student.rate}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Main Content Area */}
+          <div className="flex-1 overflow-y-auto">
+            {attendanceData.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                No attendance data found for the selected criteria.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {attendanceData.map((record, index) => (
+                  <div
+                    key={index}
+                    className="bg-white border rounded-lg overflow-hidden"
+                  >
+                    <div
+                      className="p-4 hover:bg-gray-50 cursor-pointer"
+                      onClick={() => toggleDetails(index)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div>
+                            <div className="font-semibold">
+                              {new Date(record.date).toLocaleDateString(
+                                "en-US",
+                                {
+                                  weekday: "long",
+                                  year: "numeric",
+                                  month: "long",
+                                  day: "numeric",
+                                }
+                              )}
+                            </div>
+                            <div className="text-sm text-gray-600">
+                              {record.session}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-6">
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-green-600">
+                              {record.present}
+                            </div>
+                            <div className="text-xs text-gray-600">Present</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-red-600">
+                              {record.absent}
+                            </div>
+                            <div className="text-xs text-gray-600">Absent</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-yellow-600">
+                              {record.late}
+                            </div>
+                            <div className="text-xs text-gray-600">Late</div>
+                          </div>
+                          <div className="text-center">
+                            <div
+                              className={`text-3xl font-bold ${getAttendanceColor(
+                                record.attendanceRate
+                              )}`}
+                            >
+                              {record.attendanceRate}%
+                            </div>
+                            <div className="text-xs text-gray-600">
+                              Attendance
+                            </div>
+                          </div>
+                          <div>
+                            <span className="text-gray-400">
+                              {showDetails[index] ? "▲" : "▼"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {showDetails[index] && (
+                      <div className="px-4 pb-4 bg-gray-50 border-t">
+                        <h4 className="font-semibold mb-2 mt-3">
+                          Student Details
+                        </h4>
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                          {record.students.map((student) => (
+                            <div
+                              key={student.id}
+                              className={`px-3 py-2 rounded text-sm ${getStatusColor(
+                                student.status
+                              )}`}
+                            >
+                              <div className="font-medium">{student.name}</div>
+                              <div className="text-xs opacity-75">
+                                {student.status.charAt(0).toUpperCase() +
+                                  student.status.slice(1)}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Student Card Component
   const StudentCard = ({ student }) => {
     const lifetimeLevel = getStudentLevel(student.lifetimeXP || 0);
