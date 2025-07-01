@@ -201,6 +201,7 @@ const VEXLifetimeAchievementSystem = () => {
   const [attendance, setAttendance] = useState({}); // { sessionId: { date: { studentId: 'present'|'absent'|'late' } } }
   const [attendanceSelectedDate, setAttendanceSelectedDate] = useState(null);
   const [showAttendanceManager, setShowAttendanceManager] = useState(false);
+  const [showAttendanceReport, setShowAttendanceReport] = useState(false);
 
   // Helper to migrate old string sessions to new format
   const migrateSessionsToNewFormat = (oldSessions) => {
