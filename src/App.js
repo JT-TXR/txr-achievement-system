@@ -2008,6 +2008,12 @@ const VEXLifetimeAchievementSystem = () => {
       >
         📅 Attendance
       </button>
+      <button
+        onClick={() => setShowAttendanceReport(true)}
+        className="px-3 py-1 bg-teal-600 rounded hover:bg-teal-700 text-white"
+      >
+        📈 Report
+      </button>
     </div>
   );
 
