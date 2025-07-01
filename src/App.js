@@ -2982,16 +2982,37 @@ const VEXLifetimeAchievementSystem = () => {
     };
 
     const updateAttendance = (studentId, status) => {
-      setAttendance((prev) => ({
-        ...prev,
-        [currentSession]: {
-          ...prev[currentSession],
-          [selectedDate]: {
-            ...prev[currentSession]?.[selectedDate],
-            [studentId]: status,
+      // Get current status
+      const currentStatus =
+        attendance[currentSession]?.[selectedDate]?.[studentId] || "unmarked";
+
+      // If clicking the same status, clear it (set to unmarked)
+      if (currentStatus === status) {
+        setAttendance((prev) => {
+          const newAttendance = { ...prev };
+          if (!newAttendance[currentSession]) {
+            newAttendance[currentSession] = {};
+          }
+          if (!newAttendance[currentSession][selectedDate]) {
+            newAttendance[currentSession][selectedDate] = {};
+          }
+          // Delete the entry to mark as unmarked
+          delete newAttendance[currentSession][selectedDate][studentId];
+          return newAttendance;
+        });
+      } else {
+        // Otherwise, set the new status
+        setAttendance((prev) => ({
+          ...prev,
+          [currentSession]: {
+            ...prev[currentSession],
+            [selectedDate]: {
+              ...prev[currentSession]?.[selectedDate],
+              [studentId]: status,
+            },
           },
-        },
-      }));
+        }));
+      }
     };
 
     const markAllPresent = () => {
