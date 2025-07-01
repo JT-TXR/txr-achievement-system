@@ -3288,8 +3288,8 @@ const VEXLifetimeAchievementSystem = () => {
 
       if (!dateRange.start || !dateRange.end) return data;
 
-      const startDate = new Date(dateRange.start);
-      const endDate = new Date(dateRange.end);
+      const startDate = new Date(dateRange.start + "T00:00:00");
+      const endDate = new Date(dateRange.end + "T23:59:59");
 
       // Get all relevant sessions
       const relevantSessions =
@@ -3309,7 +3309,7 @@ const VEXLifetimeAchievementSystem = () => {
         // Filter class dates within range
         const classesInRange = session.classDates.filter((date) => {
           if (!date) return false;
-          const classDate = new Date(date);
+          const classDate = new Date(date + "T12:00:00");
           return classDate >= startDate && classDate <= endDate;
         });
 
@@ -3514,7 +3514,7 @@ const VEXLifetimeAchievementSystem = () => {
         "Attendance Rate",
       ];
       const rows = attendanceData.map((record) => [
-        new Date(record.date).toLocaleDateString(),
+        new Date(record.date + "T12:00:00").toLocaleDateString(),
         record.session,
         record.totalEnrolled,
         record.present,
@@ -3723,15 +3723,14 @@ const VEXLifetimeAchievementSystem = () => {
                         <div className="flex items-center gap-4">
                           <div>
                             <div className="font-semibold">
-                              {new Date(record.date).toLocaleDateString(
-                                "en-US",
-                                {
-                                  weekday: "long",
-                                  year: "numeric",
-                                  month: "long",
-                                  day: "numeric",
-                                }
-                              )}
+                              {new Date(
+                                record.date + "T12:00:00"
+                              ).toLocaleDateString("en-US", {
+                                weekday: "long",
+                                year: "numeric",
+                                month: "long",
+                                day: "numeric",
+                              })}
                             </div>
                             <div className="text-sm text-gray-600">
                               {record.session}
