@@ -3856,6 +3856,585 @@ const VEXLifetimeAchievementSystem = () => {
     );
   };
 
+  // Tournament Wizard Component
+  const TournamentWizard = () => {
+    const [step, setStep] = useState(1);
+    const [tournamentConfig, setTournamentConfig] = useState({
+      name: "",
+      format: "teamwork", // 'teamwork', 'driver', 'autonomous', 'custom'
+      teams: [],
+      matchesPerTeam: 3,
+      skillsTrials: 3,
+      scoringMethod: "highest", // 'highest' or 'average'
+      customGameName: "",
+    });
+
+    // Get teams for current session
+    const sessionTeams = teams.filter((t) => t.session === currentSession);
+
+    const handleNext = () => {
+      if (step === 1 && !tournamentConfig.name) {
+        alert("Please enter a tournament name");
+        return;
+      }
+      if (step === 2 && tournamentConfig.teams.length < 2) {
+        alert("Please select at least 2 teams");
+        return;
+      }
+      setStep(step + 1);
+    };
+
+    const handleBack = () => {
+      setStep(step - 1);
+    };
+
+    const toggleTeam = (teamId) => {
+      const newTeams = tournamentConfig.teams.includes(teamId)
+        ? tournamentConfig.teams.filter((id) => id !== teamId)
+        : [...tournamentConfig.teams, teamId];
+
+      setTournamentConfig({
+        ...tournamentConfig,
+        teams: newTeams,
+      });
+    };
+
+    const selectAllTeams = () => {
+      setTournamentConfig({
+        ...tournamentConfig,
+        teams: sessionTeams.map((t) => t.id),
+      });
+    };
+
+    const createTournament = () => {
+      const newTournament = {
+        id: `tournament_${Date.now()}`,
+        sessionId: currentSession,
+        name: tournamentConfig.name,
+        format: tournamentConfig.format,
+        status: "setup",
+        config: {
+          matchesPerTeam: tournamentConfig.matchesPerTeam,
+          skillsTrials: tournamentConfig.skillsTrials,
+          scoringMethod: tournamentConfig.scoringMethod,
+          customGameName: tournamentConfig.customGameName,
+        },
+        teams: tournamentConfig.teams,
+        matches: {
+          quals: [],
+          finals: [],
+        },
+        results: {
+          qualRankings: [],
+          finalRankings: [],
+          awards: [],
+        },
+        createdAt: new Date().toISOString(),
+      };
+
+      // Generate qualification matches based on format
+      if (tournamentConfig.format === "teamwork") {
+        newTournament.matches.quals = generateQualificationMatches(
+          tournamentConfig.teams,
+          tournamentConfig.matchesPerTeam
+        );
+        newTournament.status = "quals";
+      } else if (
+        tournamentConfig.format === "driver" ||
+        tournamentConfig.format === "autonomous"
+      ) {
+        // For skills, generate trial slots
+        newTournament.matches.quals = generateSkillsTrials(
+          tournamentConfig.teams,
+          tournamentConfig.skillsTrials
+        );
+        newTournament.status = "quals";
+      }
+
+      setTournaments([...tournaments, newTournament]);
+      setActiveTournament(newTournament);
+      setShowTournamentWizard(false);
+      setShowTournamentDashboard(true);
+    };
+
+    // Match generation algorithm for teamwork
+    const generateQualificationMatches = (teamIds, matchesPerTeam) => {
+      const matches = [];
+      const teamPairings = new Map(); // Track which teams have been paired
+
+      // Initialize pairing tracking
+      teamIds.forEach((teamId) => {
+        teamPairings.set(teamId, new Set());
+      });
+
+      let matchNumber = 1;
+
+      // Generate matches ensuring each team plays matchesPerTeam times
+      for (let round = 0; round < matchesPerTeam; round++) {
+        const availableTeams = [...teamIds];
+
+        while (availableTeams.length >= 2) {
+          // Find the team with fewest matches so far
+          const team1 = availableTeams.reduce((min, team) => {
+            const team1Matches = matches.filter((m) =>
+              m.teams.includes(team)
+            ).length;
+            const minMatches = matches.filter((m) =>
+              m.teams.includes(min)
+            ).length;
+            return team1Matches < minMatches ? team : min;
+          }, availableTeams[0]);
+
+          // Remove team1 from available
+          availableTeams.splice(availableTeams.indexOf(team1), 1);
+
+          // Find best partner for team1 (one they haven't been paired with)
+          const team1Pairings = teamPairings.get(team1);
+          let team2 = availableTeams.find((t) => !team1Pairings.has(t));
+
+          // If no unpaired partner, take any available
+          if (!team2 && availableTeams.length > 0) {
+            team2 = availableTeams[0];
+          }
+
+          if (team2) {
+            // Remove team2 from available
+            availableTeams.splice(availableTeams.indexOf(team2), 1);
+
+            // Create match
+            matches.push({
+              id: `qual_${Date.now()}_${matchNumber}`,
+              matchNumber: `Q${matchNumber}`,
+              teams: [team1, team2],
+              score: null,
+              completed: false,
+            });
+
+            // Update pairings
+            teamPairings.get(team1).add(team2);
+            teamPairings.get(team2).add(team1);
+
+            matchNumber++;
+          }
+        }
+      }
+
+      return matches;
+    };
+
+    // Generate skills trials
+    const generateSkillsTrials = (teamIds, trialsPerTeam) => {
+      const trials = [];
+      let trialNumber = 1;
+
+      teamIds.forEach((teamId) => {
+        for (let i = 0; i < trialsPerTeam; i++) {
+          trials.push({
+            id: `trial_${Date.now()}_${trialNumber}`,
+            trialNumber: `T${trialNumber}`,
+            teamId: teamId,
+            attempt: i + 1,
+            score: null,
+            completed: false,
+          });
+          trialNumber++;
+        }
+      });
+
+      return trials;
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="bg-white rounded-lg shadow-xl p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold">🏆 Create Tournament</h2>
+            <button
+              onClick={() => setShowTournamentWizard(false)}
+              className="text-2xl hover:text-gray-600"
+            >
+              ×
+            </button>
+          </div>
+
+          {/* Progress Indicator */}
+          <div className="flex justify-center mb-8">
+            <div className="flex items-center">
+              <div
+                className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
+                  step >= 1 ? "bg-blue-500 text-white" : "bg-gray-300"
+                }`}
+              >
+                1
+              </div>
+              <div
+                className={`w-20 h-1 ${
+                  step >= 2 ? "bg-blue-500" : "bg-gray-300"
+                }`}
+              />
+              <div
+                className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
+                  step >= 2 ? "bg-blue-500 text-white" : "bg-gray-300"
+                }`}
+              >
+                2
+              </div>
+              <div
+                className={`w-20 h-1 ${
+                  step >= 3 ? "bg-blue-500" : "bg-gray-300"
+                }`}
+              />
+              <div
+                className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
+                  step >= 3 ? "bg-blue-500 text-white" : "bg-gray-300"
+                }`}
+              >
+                3
+              </div>
+            </div>
+          </div>
+
+          {/* Step 1: Basic Info */}
+          {step === 1 && (
+            <div>
+              <h3 className="text-xl font-semibold mb-4">
+                Step 1: Tournament Details
+              </h3>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-2">
+                  Tournament Name
+                </label>
+                <input
+                  type="text"
+                  value={tournamentConfig.name}
+                  onChange={(e) =>
+                    setTournamentConfig({
+                      ...tournamentConfig,
+                      name: e.target.value,
+                    })
+                  }
+                  placeholder="e.g., Week 3 Championship"
+                  className="w-full px-3 py-2 border rounded-lg"
+                  autoFocus
+                />
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-2">
+                  Tournament Format
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() =>
+                      setTournamentConfig({
+                        ...tournamentConfig,
+                        format: "teamwork",
+                      })
+                    }
+                    className={`p-4 rounded-lg border-2 ${
+                      tournamentConfig.format === "teamwork"
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-gray-300"
+                    }`}
+                  >
+                    <div className="text-2xl mb-1">🤝</div>
+                    <div className="font-semibold">Teamwork Challenge</div>
+                    <div className="text-sm text-gray-600">2v0 Cooperative</div>
+                  </button>
+
+                  <button
+                    onClick={() =>
+                      setTournamentConfig({
+                        ...tournamentConfig,
+                        format: "driver",
+                      })
+                    }
+                    className={`p-4 rounded-lg border-2 ${
+                      tournamentConfig.format === "driver"
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-gray-300"
+                    }`}
+                  >
+                    <div className="text-2xl mb-1">🎮</div>
+                    <div className="font-semibold">Driver Skills</div>
+                    <div className="text-sm text-gray-600">Individual</div>
+                  </button>
+
+                  <button
+                    onClick={() =>
+                      setTournamentConfig({
+                        ...tournamentConfig,
+                        format: "autonomous",
+                      })
+                    }
+                    className={`p-4 rounded-lg border-2 ${
+                      tournamentConfig.format === "autonomous"
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-gray-300"
+                    }`}
+                  >
+                    <div className="text-2xl mb-1">🤖</div>
+                    <div className="font-semibold">Autonomous Skills</div>
+                    <div className="text-sm text-gray-600">Individual</div>
+                  </button>
+
+                  <button
+                    onClick={() =>
+                      setTournamentConfig({
+                        ...tournamentConfig,
+                        format: "custom",
+                      })
+                    }
+                    className={`p-4 rounded-lg border-2 ${
+                      tournamentConfig.format === "custom"
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-gray-300"
+                    }`}
+                  >
+                    <div className="text-2xl mb-1">⚙️</div>
+                    <div className="font-semibold">Custom Game</div>
+                    <div className="text-sm text-gray-600">
+                      Other challenges
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {tournamentConfig.format === "custom" && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium mb-2">
+                    Custom Game Name
+                  </label>
+                  <input
+                    type="text"
+                    value={tournamentConfig.customGameName}
+                    onChange={(e) =>
+                      setTournamentConfig({
+                        ...tournamentConfig,
+                        customGameName: e.target.value,
+                      })
+                    }
+                    placeholder="e.g., Tower Takeover"
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Step 2: Select Teams */}
+          {step === 2 && (
+            <div>
+              <h3 className="text-xl font-semibold mb-4">
+                Step 2: Select Teams
+              </h3>
+
+              <div className="flex justify-between items-center mb-4">
+                <span className="text-sm text-gray-600">
+                  Selected: {tournamentConfig.teams.length} teams
+                </span>
+                <button
+                  onClick={selectAllTeams}
+                  className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                >
+                  Select All
+                </button>
+              </div>
+
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {sessionTeams.length === 0 ? (
+                  <p className="text-gray-500 text-center py-8">
+                    No teams found for this session. Please create teams first.
+                  </p>
+                ) : (
+                  sessionTeams.map((team) => (
+                    <label
+                      key={team.id}
+                      className={`flex items-center p-3 rounded-lg border cursor-pointer ${
+                        tournamentConfig.teams.includes(team.id)
+                          ? "border-blue-500 bg-blue-50"
+                          : "border-gray-300 hover:bg-gray-50"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={tournamentConfig.teams.includes(team.id)}
+                        onChange={() => toggleTeam(team.id)}
+                        className="mr-3"
+                      />
+                      <div className="flex-1">
+                        <div className="font-semibold">
+                          {team.number}: {team.name}
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          {team.studentNames.join(", ")}
+                        </div>
+                      </div>
+                    </label>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Step 3: Configuration */}
+          {step === 3 && (
+            <div>
+              <h3 className="text-xl font-semibold mb-4">
+                Step 3: Tournament Configuration
+              </h3>
+
+              {tournamentConfig.format === "teamwork" && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium mb-2">
+                    Qualification Matches per Team
+                  </label>
+                  <select
+                    value={tournamentConfig.matchesPerTeam}
+                    onChange={(e) =>
+                      setTournamentConfig({
+                        ...tournamentConfig,
+                        matchesPerTeam: parseInt(e.target.value),
+                      })
+                    }
+                    className="w-full px-3 py-2 border rounded-lg"
+                  >
+                    <option value={3}>3 matches</option>
+                    <option value={4}>4 matches</option>
+                    <option value={5}>5 matches</option>
+                    <option value={6}>6 matches</option>
+                  </select>
+                </div>
+              )}
+
+              {(tournamentConfig.format === "driver" ||
+                tournamentConfig.format === "autonomous") && (
+                <>
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium mb-2">
+                      Trial Runs per Team
+                    </label>
+                    <select
+                      value={tournamentConfig.skillsTrials}
+                      onChange={(e) =>
+                        setTournamentConfig({
+                          ...tournamentConfig,
+                          skillsTrials: parseInt(e.target.value),
+                        })
+                      }
+                      className="w-full px-3 py-2 border rounded-lg"
+                    >
+                      <option value={1}>1 trial</option>
+                      <option value={2}>2 trials</option>
+                      <option value={3}>3 trials</option>
+                      <option value={4}>4 trials</option>
+                      <option value={5}>5 trials</option>
+                    </select>
+                  </div>
+
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium mb-2">
+                      Scoring Method
+                    </label>
+                    <select
+                      value={tournamentConfig.scoringMethod}
+                      onChange={(e) =>
+                        setTournamentConfig({
+                          ...tournamentConfig,
+                          scoringMethod: e.target.value,
+                        })
+                      }
+                      className="w-full px-3 py-2 border rounded-lg"
+                    >
+                      <option value="highest">Highest Score</option>
+                      <option value="average">Average Score</option>
+                    </select>
+                  </div>
+                </>
+              )}
+
+              {/* Summary */}
+              <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+                <h4 className="font-semibold mb-2">Tournament Summary</h4>
+                <div className="text-sm space-y-1">
+                  <div>
+                    <span className="font-medium">Name:</span>{" "}
+                    {tournamentConfig.name}
+                  </div>
+                  <div>
+                    <span className="font-medium">Format:</span>{" "}
+                    {tournamentConfig.format === "teamwork"
+                      ? "Teamwork Challenge"
+                      : tournamentConfig.format === "driver"
+                      ? "Driver Skills"
+                      : tournamentConfig.format === "autonomous"
+                      ? "Autonomous Skills"
+                      : `Custom: ${tournamentConfig.customGameName}`}
+                  </div>
+                  <div>
+                    <span className="font-medium">Teams:</span>{" "}
+                    {tournamentConfig.teams.length}
+                  </div>
+                  {tournamentConfig.format === "teamwork" && (
+                    <div>
+                      <span className="font-medium">Matches per team:</span>{" "}
+                      {tournamentConfig.matchesPerTeam}
+                    </div>
+                  )}
+                  {(tournamentConfig.format === "driver" ||
+                    tournamentConfig.format === "autonomous") && (
+                    <>
+                      <div>
+                        <span className="font-medium">Trials per team:</span>{" "}
+                        {tournamentConfig.skillsTrials}
+                      </div>
+                      <div>
+                        <span className="font-medium">Scoring:</span>{" "}
+                        {tournamentConfig.scoringMethod}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Navigation Buttons */}
+          <div className="flex justify-between mt-8">
+            <button
+              onClick={handleBack}
+              disabled={step === 1}
+              className={`px-6 py-2 rounded ${
+                step === 1
+                  ? "bg-gray-300 cursor-not-allowed"
+                  : "bg-gray-500 hover:bg-gray-600 text-white"
+              }`}
+            >
+              Back
+            </button>
+
+            {step < 3 ? (
+              <button
+                onClick={handleNext}
+                className="px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+              >
+                Next
+              </button>
+            ) : (
+              <button
+                onClick={createTournament}
+                className="px-6 py-2 bg-green-500 text-white rounded hover:bg-green-600 font-semibold"
+              >
+                Create Tournament
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Student Card Component
   const StudentCard = ({ student }) => {
     const lifetimeLevel = getStudentLevel(student.lifetimeXP || 0);
@@ -4604,6 +5183,7 @@ const VEXLifetimeAchievementSystem = () => {
           onClose={() => setShowAttendanceReport(false)}
         />
       )}
+      {showTournamentWizard && <TournamentWizard />}
     </div>
   );
 };
