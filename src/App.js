@@ -243,6 +243,13 @@ const VEXLifetimeAchievementSystem = () => {
   const [showTournamentView, setShowTournamentView] = useState(false);
   const [skillsType, setSkillsType] = useState("driver");
 
+  // New Tournament System States
+  const [tournaments, setTournaments] = useState([]);
+  const [activeTournament, setActiveTournament] = useState(null);
+  const [showTournamentWizard, setShowTournamentWizard] = useState(false);
+  const [showTournamentDashboard, setShowTournamentDashboard] = useState(false);
+  const [showAwardsCeremony, setShowAwardsCeremony] = useState(false);
+
   // Session completion milestones
   const sessionMilestones = {
     attendance: {
@@ -286,6 +293,9 @@ const VEXLifetimeAchievementSystem = () => {
     const savedSkills = localStorage.getItem("vexSkillsScores");
     const savedAttendance = localStorage.getItem("vexAttendance");
     if (savedAttendance) setAttendance(JSON.parse(savedAttendance));
+
+    const savedTournaments = localStorage.getItem("vexTournaments");
+    if (savedTournaments) setTournaments(JSON.parse(savedTournaments));
 
     if (savedStudents) setStudents(JSON.parse(savedStudents));
     if (savedAchievements) setAchievements(JSON.parse(savedAchievements));
@@ -353,6 +363,10 @@ const VEXLifetimeAchievementSystem = () => {
     localStorage.setItem("vexTeamworkMatches", JSON.stringify(teamworkMatches));
     localStorage.setItem("vexSkillsScores", JSON.stringify(skillsScores));
   }, [teams, teamworkMatches, skillsScores]);
+
+  useEffect(() => {
+    localStorage.setItem("vexTournaments", JSON.stringify(tournaments));
+  }, [tournaments]);
 
   // Calculate levels
   const levels = [
@@ -588,6 +602,8 @@ const VEXLifetimeAchievementSystem = () => {
       teams,
       teamworkMatches,
       skillsScores,
+      tournaments,
+      attendance,
       exportDate: new Date().toISOString(),
     };
     const dataStr = JSON.stringify(exportObj, null, 2);
@@ -654,11 +670,20 @@ const VEXLifetimeAchievementSystem = () => {
 
   // Tournament Handlers
   const handleSaveTeamworkMatch = (match) => {
-    setTeamworkMatches([...teamworkMatches, match]);
+    const enhancedMatch = {
+      ...match,
+      tournamentId: activeTournament?.id || null,
+      matchType: activeTournament ? "qual" : "practice",
+    };
+    setTeamworkMatches([...teamworkMatches, enhancedMatch]);
   };
 
   const handleSaveSkillsScore = (score) => {
-    setSkillsScores([...skillsScores, score]);
+    const enhancedScore = {
+      ...score,
+      tournamentId: activeTournament?.id || null,
+    };
+    setSkillsScores([...skillsScores, enhancedScore]);
   };
 
   // Student Manager Modal
