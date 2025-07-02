@@ -1988,98 +1988,97 @@ const VEXLifetimeAchievementSystem = () => {
     );
   };
 
-// Tournament Control Buttons
-const TournamentButtons = () => {
-  // Check for active tournament in current session
-  const activeTournamentExists = tournaments.some(t => 
-    t.sessionId === currentSession && 
-    t.status !== 'complete'
-  );
+  // Tournament Control Buttons
+  const TournamentButtons = () => {
+    // Check for active tournament in current session
+    const activeTournamentExists = tournaments.some(
+      (t) => t.sessionId === currentSession && t.status !== "complete"
+    );
 
-  return (
-    <div className="flex gap-2 flex-wrap">
-      {activeTournamentExists ? (
-        <>
-          <button
-            onClick={() => {
-              const ongoingTournament = tournaments.find(t => 
-                t.sessionId === currentSession && 
-                t.status !== 'complete'
-              );
-              setActiveTournament(ongoingTournament);
-              setShowTournamentDashboard(true);
-            }}
-            className="px-3 py-1 bg-green-500 rounded hover:bg-green-600 text-white font-semibold animate-pulse"
-          >
-            📊 Continue Tournament
-          </button>
+    return (
+      <div className="flex gap-2 flex-wrap">
+        {activeTournamentExists ? (
+          <>
+            <button
+              onClick={() => {
+                const ongoingTournament = tournaments.find(
+                  (t) =>
+                    t.sessionId === currentSession && t.status !== "complete"
+                );
+                setActiveTournament(ongoingTournament);
+                setShowTournamentDashboard(true);
+              }}
+              className="px-3 py-1 bg-green-500 rounded hover:bg-green-600 text-white font-semibold animate-pulse"
+            >
+              📊 Continue Tournament
+            </button>
+            <button
+              onClick={() => setShowTournamentWizard(true)}
+              className="px-3 py-1 bg-yellow-600 rounded hover:bg-yellow-700 text-white"
+            >
+              ➕ New Tournament
+            </button>
+          </>
+        ) : (
           <button
             onClick={() => setShowTournamentWizard(true)}
-            className="px-3 py-1 bg-yellow-600 rounded hover:bg-yellow-700 text-white"
+            className="px-3 py-1 bg-yellow-500 rounded hover:bg-yellow-600 text-white font-semibold"
           >
-            ➕ New Tournament
+            🏆 New Tournament
           </button>
-        </>
-      ) : (
+        )}
+
         <button
-          onClick={() => setShowTournamentWizard(true)}
-          className="px-3 py-1 bg-yellow-500 rounded hover:bg-yellow-600 text-white font-semibold"
+          onClick={() => setShowTeamManager(true)}
+          className="px-3 py-1 bg-blue-600 rounded hover:bg-blue-700 text-white"
         >
-          🏆 New Tournament
+          👥 Teams
         </button>
-      )}
-      
-      <button
-        onClick={() => setShowTeamManager(true)}
-        className="px-3 py-1 bg-blue-600 rounded hover:bg-blue-700 text-white"
-      >
-        👥 Teams
-      </button>
-    <button
-      onClick={() => setShowMatchEntry(true)}
-      className="px-3 py-1 bg-green-600 rounded hover:bg-green-700 text-white"
-    >
-      🤝 Teamwork
-    </button>
-    <button
-      onClick={() => {
-        setSkillsType("driver");
-        setShowSkillsEntry(true);
-      }}
-      className="px-3 py-1 bg-purple-600 rounded hover:bg-purple-700 text-white"
-    >
-      🎮 Driver Skills
-    </button>
-    <button
-      onClick={() => {
-        setSkillsType("autonomous");
-        setShowSkillsEntry(true);
-      }}
-      className="px-3 py-1 bg-indigo-600 rounded hover:bg-indigo-700 text-white"
-    >
-      🤖 Auton Skills
-    </button>
-    <button
-      onClick={() => setShowTournamentView(true)}
-      className="px-3 py-1 bg-orange-600 rounded hover:bg-orange-700 text-white"
-    >
-      📊 Tournament
-    </button>
-    <button
-      onClick={() => setShowAttendanceManager(true)}
-      className="px-3 py-1 bg-purple-500 text-white rounded hover:bg-purple-600"
-    >
-      📅 Attendance
-    </button>
-    <button
-      onClick={() => setShowAttendanceReport(true)}
-      className="px-3 py-1 bg-teal-600 rounded hover:bg-teal-700 text-white"
-    >
-      📈 Report
-    </button>
-  </div>
-);
-};
+        <button
+          onClick={() => setShowMatchEntry(true)}
+          className="px-3 py-1 bg-green-600 rounded hover:bg-green-700 text-white"
+        >
+          🤝 Teamwork
+        </button>
+        <button
+          onClick={() => {
+            setSkillsType("driver");
+            setShowSkillsEntry(true);
+          }}
+          className="px-3 py-1 bg-purple-600 rounded hover:bg-purple-700 text-white"
+        >
+          🎮 Driver Skills
+        </button>
+        <button
+          onClick={() => {
+            setSkillsType("autonomous");
+            setShowSkillsEntry(true);
+          }}
+          className="px-3 py-1 bg-indigo-600 rounded hover:bg-indigo-700 text-white"
+        >
+          🤖 Auton Skills
+        </button>
+        <button
+          onClick={() => setShowTournamentView(true)}
+          className="px-3 py-1 bg-orange-600 rounded hover:bg-orange-700 text-white"
+        >
+          📊 Tournament
+        </button>
+        <button
+          onClick={() => setShowAttendanceManager(true)}
+          className="px-3 py-1 bg-purple-500 text-white rounded hover:bg-purple-600"
+        >
+          📅 Attendance
+        </button>
+        <button
+          onClick={() => setShowAttendanceReport(true)}
+          className="px-3 py-1 bg-teal-600 rounded hover:bg-teal-700 text-white"
+        >
+          📈 Report
+        </button>
+      </div>
+    );
+  };
 
   const BulkAchievementAward = () => {
     const [selectedAchievement, setSelectedAchievement] = useState("");
@@ -3908,11 +3907,10 @@ const TournamentButtons = () => {
       customGameName: "",
     });
 
-      // Check for active tournament
-  const activeTournament = tournaments.find(t => 
-    t.sessionId === currentSession && 
-    t.status !== 'complete'
-  );
+    // Check for active tournament
+    const activeTournament = tournaments.find(
+      (t) => t.sessionId === currentSession && t.status !== "complete"
+    );
 
     // Get teams for current session
     const sessionTeams = teams.filter((t) => t.session === currentSession);
@@ -4089,37 +4087,38 @@ const TournamentButtons = () => {
       return trials;
     };
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-        {/* Add warning banner if active tournament exists */}
-        {activeTournament && (
-          <div className="mb-4 p-3 bg-orange-50 border border-orange-300 rounded-lg">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-semibold text-orange-800">
-                  ⚠️ Active Tournament in Progress
-                </p>
-                <p className="text-sm text-orange-700">
-                  "{activeTournament.name}" is currently running. Creating a new tournament won't delete it.
-                </p>
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="bg-white rounded-lg shadow-xl p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+          {/* Add warning banner if active tournament exists */}
+          {activeTournament && (
+            <div className="mb-4 p-3 bg-orange-50 border border-orange-300 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-semibold text-orange-800">
+                    ⚠️ Active Tournament in Progress
+                  </p>
+                  <p className="text-sm text-orange-700">
+                    "{activeTournament.name}" is currently running. Creating a
+                    new tournament won't delete it.
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowTournamentWizard(false);
+                    setActiveTournament(activeTournament);
+                    setShowTournamentDashboard(true);
+                  }}
+                  className="px-3 py-1 bg-orange-500 text-white rounded hover:bg-orange-600 text-sm"
+                >
+                  Go to Tournament
+                </button>
               </div>
-              <button
-                onClick={() => {
-                  setShowTournamentWizard(false);
-                  setActiveTournament(activeTournament);
-                  setShowTournamentDashboard(true);
-                }}
-                className="px-3 py-1 bg-orange-500 text-white rounded hover:bg-orange-600 text-sm"
-              >
-                Go to Tournament
-              </button>
             </div>
-          </div>
-        )}
+          )}
 
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold">🏆 Create Tournament</h2>
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold">🏆 Create Tournament</h2>
             <button
               onClick={() => setShowTournamentWizard(false)}
               className="text-2xl hover:text-gray-600"
@@ -4362,20 +4361,22 @@ const TournamentButtons = () => {
                     Qualification Matches per Team
                   </label>
                   <select
-                    value={tournamentConfig.matchesPerTeam}
-                    onChange={(e) =>
-                      setTournamentConfig({
-                        ...tournamentConfig,
-                        matchesPerTeam: parseInt(e.target.value),
-                      })
-                    }
-                    className="w-full px-3 py-2 border rounded-lg"
-                  >
-                    <option value={3}>3 matches</option>
-                    <option value={4}>4 matches</option>
-                    <option value={5}>5 matches</option>
-                    <option value={6}>6 matches</option>
-                  </select>
+  value={tournamentConfig.matchesPerTeam}
+  onChange={(e) => setTournamentConfig({
+    ...tournamentConfig, 
+    matchesPerTeam: parseInt(e.target.value)
+  })}
+  className="w-full px-3 py-2 border rounded-lg"
+>
+  <option value={1}>1 match</option>
+  <option value={2}>2 matches</option>
+  <option value={3}>3 matches</option>
+  <option value={4}>4 matches</option>
+  <option value={5}>5 matches</option>
+  <option value={6}>6 matches</option>
+  <option value={7}>7 matches</option>
+  <option value={8}>8 matches</option>
+</select>
                 </div>
               )}
 
@@ -4594,23 +4595,23 @@ const TournamentButtons = () => {
           }
         });
 
-// Calculate averages or highest based on scoring method
-Object.values(teamStats).forEach(stat => {
-  if (stat.matches > 0) {
-    if (currentTournament.format === 'teamwork') {
-      // Teamwork always uses average
-      stat.average = (stat.totalScore / stat.matches).toFixed(1);
-    } else {
-      // Skills uses configured scoring method
-      if (currentTournament.config.scoringMethod === 'average') {
-        stat.average = (stat.totalScore / stat.matches).toFixed(1);
-      } else {
-        // Highest score
-        stat.average = Math.max(...stat.scores);
-      }
-    }
-  }
-});
+      // Calculate averages or highest based on scoring method
+      Object.values(teamStats).forEach((stat) => {
+        if (stat.matches > 0) {
+          if (currentTournament.format === "teamwork") {
+            // Teamwork always uses average
+            stat.average = (stat.totalScore / stat.matches).toFixed(1);
+          } else {
+            // Skills uses configured scoring method
+            if (currentTournament.config.scoringMethod === "average") {
+              stat.average = (stat.totalScore / stat.matches).toFixed(1);
+            } else {
+              // Highest score
+              stat.average = Math.max(...stat.scores);
+            }
+          }
+        }
+      });
 
       // Sort by average/highest score
       return Object.values(teamStats).sort((a, b) => b.average - a.average);
@@ -4618,115 +4619,54 @@ Object.values(teamStats).forEach(stat => {
 
     const rankings = calculateQualRankings();
 
-// Generate finals matches based on rankings
-const generateFinals = () => {
-  if (currentTournament.format !== 'teamwork') {
-    alert('Finals are only for teamwork tournaments');
-    return;
-  }
+    // Generate finals matches based on rankings
+    const generateFinals = () => {
+      if (currentTournament.format !== "teamwork") {
+        alert("Finals are only for teamwork tournaments");
+        return;
+      }
 
-  const finalMatches = [];
-  let matchNumber = 1;
+      const finalMatches = [];
+      let matchNumber = 1;
 
-  // Pair teams: 1st+2nd, 3rd+4th, etc.
-  // But add them in reverse order (lowest ranks first)
-  const pairings = [];
-  for (let i = 0; i < rankings.length - 1; i += 2) {
-    pairings.push({
-      teams: [rankings[i].teamId, rankings[i + 1].teamId],
-      rankSum: (i + 1) + (i + 2) // Sum of ranks for ordering
-    });
-  }
-
-  // Sort by rank sum (highest first = lowest ranked teams)
-  pairings.sort((a, b) => b.rankSum - a.rankSum);
-
-  // Create matches in order
-  pairings.forEach(pairing => {
-    finalMatches.push({
-      id: `final_${Date.now()}_${matchNumber}`,
-      matchNumber: `F${matchNumber}`,
-      teams: pairing.teams,
-      score: null,
-      completed: false
-    });
-    matchNumber++;
-  });
-
-  // If odd number of teams, last team gets a bye
-  if (rankings.length % 2 === 1) {
-    console.log('Odd number of teams - last team needs special handling');
-  }
-
-  // Update tournament
-  const updatedTournament = {
-    ...currentTournament,
-    matches: {
-      ...currentTournament.matches,
-      finals: finalMatches
-    },
-    status: 'finals'
-  };
-
-  setTournaments(tournaments.map(t => 
-    t.id === currentTournament.id ? updatedTournament : t
-  ));
-  setActiveTournament(updatedTournament);
-};
-
-    // Complete tournament and go to awards
-    const completeTournament = () => {
-      // Calculate final rankings
-      const finalRankings = [];
-
-      if (currentTournament.format === "teamwork") {
-        // For teamwork, rank by finals scores
-        const finalScores = {};
-
-        finalMatches
-          .filter((m) => m.completed)
-          .forEach((match) => {
-            match.teams.forEach((teamId) => {
-              if (!finalScores[teamId] || match.score > finalScores[teamId]) {
-                finalScores[teamId] = match.score;
-              }
-            });
-          });
-
-        // Convert to rankings array
-        Object.entries(finalScores).forEach(([teamId, score]) => {
-          finalRankings.push({
-            teamId: parseInt(teamId),
-            score,
-            rank: 0, // Will be set after sorting
-          });
-        });
-
-        // Sort and assign ranks
-        finalRankings.sort((a, b) => b.score - a.score);
-        finalRankings.forEach((ranking, index) => {
-          ranking.rank = index + 1;
-        });
-      } else {
-        // For skills, use qual rankings as final rankings
-        rankings.forEach((stat, index) => {
-          finalRankings.push({
-            teamId: stat.teamId,
-            score: parseFloat(stat.average),
-            rank: index + 1,
-          });
+      // Pair teams: 1st+2nd, 3rd+4th, etc.
+      // But add them in reverse order (lowest ranks first)
+      const pairings = [];
+      for (let i = 0; i < rankings.length - 1; i += 2) {
+        pairings.push({
+          teams: [rankings[i].teamId, rankings[i + 1].teamId],
+          rankSum: i + 1 + (i + 2), // Sum of ranks for ordering
         });
       }
 
-      // Update tournament with final results
+      // Sort by rank sum (highest first = lowest ranked teams)
+      pairings.sort((a, b) => b.rankSum - a.rankSum);
+
+      // Create matches in order
+      pairings.forEach((pairing) => {
+        finalMatches.push({
+          id: `final_${Date.now()}_${matchNumber}`,
+          matchNumber: `F${matchNumber}`,
+          teams: pairing.teams,
+          score: null,
+          completed: false,
+        });
+        matchNumber++;
+      });
+
+      // If odd number of teams, last team gets a bye
+      if (rankings.length % 2 === 1) {
+        console.log("Odd number of teams - last team needs special handling");
+      }
+
+      // Update tournament
       const updatedTournament = {
         ...currentTournament,
-        status: "complete",
-        results: {
-          ...currentTournament.results,
-          qualRankings: rankings,
-          finalRankings: finalRankings,
+        matches: {
+          ...currentTournament.matches,
+          finals: finalMatches,
         },
+        status: "finals",
       };
 
       setTournaments(
@@ -4735,11 +4675,76 @@ const generateFinals = () => {
         )
       );
       setActiveTournament(updatedTournament);
-
-      // Show awards ceremony
-      setShowTournamentDashboard(false);
-      setShowAwardsCeremony(true);
     };
+
+// Complete tournament and go to awards
+const completeTournament = () => {
+  // Calculate final rankings
+  const finalRankings = [];
+  
+  if (currentTournament.format === 'teamwork') {
+    // For teamwork, rank by ALLIANCE (finals match score)
+    const allianceScores = {};
+    
+    // Group teams by their finals match
+    finalMatches.filter(m => m.completed).forEach(match => {
+      // Both teams in an alliance get the same score
+      const allianceKey = match.teams.sort().join('-');
+      allianceScores[allianceKey] = {
+        teams: match.teams,
+        score: match.score,
+        matchId: match.id
+      };
+    });
+
+    // Convert to rankings array and sort by score
+    const sortedAlliances = Object.values(allianceScores)
+      .sort((a, b) => b.score - a.score);
+
+    // Assign ranks to alliances
+    sortedAlliances.forEach((alliance, index) => {
+      const rank = index + 1;
+      // Both teams in the alliance get the same rank
+      alliance.teams.forEach(teamId => {
+        finalRankings.push({
+          teamId: teamId,
+          score: alliance.score,
+          rank: rank,
+          alliancePartner: alliance.teams.find(id => id !== teamId)
+        });
+      });
+    });
+  } else {
+    // For skills, use qual rankings as final rankings
+    rankings.forEach((stat, index) => {
+      finalRankings.push({
+        teamId: stat.teamId,
+        score: parseFloat(stat.average),
+        rank: index + 1
+      });
+    });
+  }
+
+  // Update tournament with final results
+  const updatedTournament = {
+    ...currentTournament,
+    status: 'complete',
+    results: {
+      ...currentTournament.results,
+      qualRankings: rankings,
+      finalRankings: finalRankings
+    }
+  };
+
+  setTournaments(tournaments.map(t => 
+    t.id === currentTournament.id ? updatedTournament : t
+  ));
+  setActiveTournament(updatedTournament);
+  
+  // Show awards ceremony
+  setShowTournamentDashboard(false);
+  setShowAwardsCeremony(true);
+};
 
     // Handle match score entry
     const handleMatchScore = (matchId, score) => {
@@ -5076,14 +5081,14 @@ const generateFinals = () => {
             {/* Rankings Tab */}
             {activeTab === "rankings" && (
               <div>
-<h3 className="text-lg font-semibold mb-4">
-  Current Rankings
-  {currentTournament.format === 'teamwork' 
-    ? ' (By Average Score)' 
-    : currentTournament.config.scoringMethod === 'average' 
-      ? ' (By Average)' 
-      : ' (By Highest Score)'}
-</h3>
+                <h3 className="text-lg font-semibold mb-4">
+                  Current Rankings
+                  {currentTournament.format === "teamwork"
+                    ? " (By Average Score)"
+                    : currentTournament.config.scoringMethod === "average"
+                    ? " (By Average)"
+                    : " (By Highest Score)"}
+                </h3>
                 <div className="space-y-2">
                   {rankings.map((stat, index) => {
                     const team = tournamentTeams.find(
@@ -5124,6 +5129,351 @@ const generateFinals = () => {
               </div>
             )}
           </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Awards Ceremony Component
+  const AwardsCeremony = () => {
+    const tournament = activeTournament;
+    const [currentReveal, setCurrentReveal] = useState(0);
+    const [showConfetti, setShowConfetti] = useState(false);
+    const [awardedAchievements, setAwardedAchievements] = useState([]);
+    const [awardedXP, setAwardedXP] = useState({});
+
+    if (!tournament || tournament.status !== "complete") {
+      return null;
+    }
+
+    // Get tournament teams and students
+    const tournamentTeams = teams.filter((t) =>
+      tournament.teams.includes(t.id)
+    );
+    const finalRankings = tournament.results.finalRankings || [];
+
+    // Define achievements to award
+    const tournamentAchievements = {
+      1: {
+        name: "Tournament Champion",
+        icon: "🏆",
+        xp: 100,
+        description: "Won 1st place in a tournament!",
+      },
+      2: {
+        name: "Silver Medal",
+        icon: "🥈",
+        xp: 75,
+        description: "Won 2nd place in a tournament!",
+      },
+      3: {
+        name: "Bronze Medal",
+        icon: "🥉",
+        xp: 50,
+        description: "Won 3rd place in a tournament!",
+      },
+      participation: {
+        name: "Tournament Competitor",
+        icon: "🎯",
+        xp: 25,
+        description: "Participated in a tournament!",
+      },
+    };
+
+    // Award achievements and XP
+    const processAwards = () => {
+      // Check if already processed
+      if (tournament.awardsProcessed) return;
+
+      const awards = [];
+      const xpAwards = {};
+
+      finalRankings.forEach((ranking) => {
+        const team = tournamentTeams.find((t) => t.id === ranking.teamId);
+        if (!team) return;
+
+        // Determine achievement based on rank
+        let achievement = null;
+        if (ranking.rank <= 3) {
+          achievement = tournamentAchievements[ranking.rank];
+        } else {
+          achievement = tournamentAchievements.participation;
+        }
+
+        // Award to each team member
+        team.studentIds.forEach((studentId) => {
+          // Track what we're awarding
+          awards.push({
+            studentId,
+            achievement,
+            teamName: team.name,
+            rank: ranking.rank,
+          });
+
+          // Award XP
+          if (!xpAwards[studentId]) {
+            xpAwards[studentId] = 0;
+          }
+          xpAwards[studentId] += achievement.xp;
+
+          // Actually award the XP (30% goes to lifetime)
+          awardXP(studentId, achievement.xp, false);
+        });
+      });
+
+      setAwardedAchievements(awards);
+      setAwardedXP(xpAwards);
+
+      // Mark as processed
+      const updatedTournament = {
+        ...tournament,
+        awardsProcessed: true,
+      };
+
+      setTournaments(
+        tournaments.map((t) => (t.id === tournament.id ? updatedTournament : t))
+      );
+      setActiveTournament(updatedTournament);
+    };
+
+    // Process awards on mount
+    useEffect(() => {
+      processAwards();
+
+      // Start reveal animation
+      const timer = setTimeout(() => {
+        setCurrentReveal(1);
+      }, 500);
+
+      return () => clearTimeout(timer);
+    }, []);
+
+// Handle reveal steps
+const handleNextReveal = () => {
+  if (currentReveal < totalRankGroups) {
+    setCurrentReveal(currentReveal + 1);
+    
+    // Show confetti when revealing 1st place (which is now the last reveal)
+    if (currentReveal === totalRankGroups - 1) {
+      setShowConfetti(true);
+      setTimeout(() => setShowConfetti(false), 5000);
+    }
+  }
+};
+
+    const handleComplete = () => {
+      // Mark tournament as awarded
+      const updatedTournament = {
+        ...tournament,
+        awardsPresented: true,
+      };
+
+      setTournaments(
+        tournaments.map((t) => (t.id === tournament.id ? updatedTournament : t))
+      );
+
+      setShowAwardsCeremony(false);
+      setActiveTournament(null);
+    };
+
+    const Confetti = () => {
+      if (!showConfetti) return null;
+      
+      return (
+        <>
+          {/* Dark overlay for better visibility */}
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-20 pointer-events-none" 
+            style={{ zIndex: 100 }}
+          />
+          
+          {/* Confetti container */}
+          <div 
+            className="fixed inset-0 pointer-events-none overflow-hidden" 
+            style={{ zIndex: 101 }}
+          >
+            {[...Array(50)].map((_, i) => (
+              <div
+                key={i}
+                className="absolute animate-fall"
+                style={{
+                  left: `${Math.random() * 100}%`,
+                  top: '-10%', // Start above viewport
+                  animationDelay: `${Math.random() * 3}s`,
+                  animationDuration: `${3 + Math.random() * 2}s`
+                }}
+              >
+                <div 
+                  className="text-3xl animate-spin"
+                  style={{ animationDuration: `${1 + Math.random() * 2}s` }}
+                >
+                  {['🎉', '🎊', '⭐', '✨', '🏆'][Math.floor(Math.random() * 5)]}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      );
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4" style={{ zIndex: 50 }}>
+        <Confetti />
+        
+        <div className="bg-white rounded-lg shadow-xl p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto relative" style={{ zIndex: 60 }}>
+          {/* Header */}
+          <div className="text-center mb-8">
+            <h1 className="text-4xl font-bold mb-2">🏆 Tournament Results</h1>
+            <h2 className="text-2xl text-gray-600">{tournament.name}</h2>
+            <p className="text-gray-500 mt-2">
+              {tournament.format === "teamwork"
+                ? "Teamwork Challenge"
+                : tournament.format === "driver"
+                ? "Driver Skills"
+                : tournament.format === "autonomous"
+                ? "Autonomous Skills"
+                : tournament.config.customGameName}
+            </p>
+          </div>
+
+{/* Results Display - Show by Alliance */}
+<div className="space-y-6 mb-8">
+  {(() => {
+    // Group teams by rank (alliance)
+    const rankGroups = {};
+    finalRankings.forEach(ranking => {
+      if (!rankGroups[ranking.rank]) {
+        rankGroups[ranking.rank] = [];
+      }
+      rankGroups[ranking.rank].push(ranking);
+    });
+    const totalRankGroups = Object.keys(rankGroups).length;
+
+    // Sort by rank (descending for reveal order)
+    const sortedRanks = Object.keys(rankGroups)
+      .map(Number)
+      .sort((a, b) => b - a);
+
+    return sortedRanks.map((rank, index) => {
+      const alliance = rankGroups[rank];
+      const isRevealed = index < currentReveal;
+      const isCurrentReveal = index === currentReveal - 1;
+      
+      return (
+        <div
+          key={rank}
+          className={`transform transition-all duration-1000 ${
+            isRevealed 
+              ? 'translate-x-0 opacity-100' 
+              : 'translate-x-full opacity-0'
+          } ${isCurrentReveal ? 'scale-105' : ''}`}
+        >
+          <div className={`p-6 rounded-lg border-2 ${
+            rank === 1 ? 'border-yellow-400 bg-yellow-50' :
+            rank === 2 ? 'border-gray-400 bg-gray-50' :
+            rank === 3 ? 'border-orange-400 bg-orange-50' :
+            'border-gray-300 bg-white'
+          }`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="text-5xl">
+                  {rank === 1 ? '🥇' :
+                   rank === 2 ? '🥈' :
+                   rank === 3 ? '🥉' :
+                   `#${rank}`}
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold mb-1">
+                    {rank === 1 ? 'Champions' :
+                     rank === 2 ? '2nd Place' :
+                     rank === 3 ? '3rd Place' :
+                     `${rank}th Place`}
+                  </h3>
+                  <div className="space-y-1">
+                    {alliance.map(ranking => {
+                      const team = tournamentTeams.find(t => t.id === ranking.teamId);
+                      return (
+                        <div key={ranking.teamId} className="text-gray-700">
+                          <span className="font-semibold">{team.number}: {team.name}</span>
+                          <span className="text-sm text-gray-500 ml-2">
+                            ({team.studentNames.join(', ')})
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-3xl font-bold text-blue-600">
+                  {alliance[0].score}
+                </div>
+                <div className="text-sm text-gray-500">
+                  Finals Score
+                </div>
+              </div>
+            </div>
+            
+            {/* Show XP Award */}
+            {isCurrentReveal && (
+              <div className="mt-4 pt-4 border-t border-gray-300">
+                <div className="flex items-center justify-center gap-2 text-green-600 animate-bounce">
+                  <span className="text-2xl">✨</span>
+                  <span className="font-bold text-lg">
+                    +{tournamentAchievements[rank <= 3 ? rank : 'participation'].xp} XP each
+                  </span>
+                  <span className="text-2xl">✨</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    });
+  })()}
+</div>
+
+{/* Action Buttons */}
+<div className="flex justify-center gap-4">
+  {currentReveal < totalRankGroups ? (
+    <button
+      onClick={handleNextReveal}
+      className="px-8 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-semibold text-lg animate-pulse"
+    >
+      Reveal Next →
+    </button>
+  ) : (
+    <button
+      onClick={handleComplete}
+      className="px-8 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 font-semibold text-lg"
+    >
+      Complete Ceremony ✓
+    </button>
+  )}
+</div>
+
+          {/* Summary of Awards (shown after all reveals) */}
+          {currentReveal >= finalRankings.length &&
+            awardedAchievements.length > 0 && (
+              <div className="mt-8 p-6 bg-blue-50 rounded-lg">
+                <h3 className="font-bold text-lg mb-3">📊 Awards Summary</h3>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  {students
+                    .filter((s) => awardedXP[s.id])
+                    .map((student) => (
+                      <div
+                        key={student.id}
+                        className="flex items-center justify-between"
+                      >
+                        <span>{student.name}</span>
+                        <span className="font-bold text-green-600">
+                          +{awardedXP[student.id]} XP
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
         </div>
       </div>
     );
@@ -5642,12 +5992,14 @@ const generateFinals = () => {
                   ))}
               </select>
 
-                {/* Add tournament status badge */}
-  {tournaments.some(t => t.sessionId === currentSession && t.status !== 'complete') && (
-    <div className="px-2 py-1 bg-green-400 text-white rounded text-sm animate-pulse">
-      Tournament Active
-    </div>
-  )}
+              {/* Add tournament status badge */}
+              {tournaments.some(
+                (t) => t.sessionId === currentSession && t.status !== "complete"
+              ) && (
+                <div className="px-2 py-1 bg-green-400 text-white rounded text-sm animate-pulse">
+                  Tournament Active
+                </div>
+              )}
               <div className="flex gap-2">
                 <button
                   onClick={() => setCurrentView("dashboard")}
@@ -5886,6 +6238,7 @@ const generateFinals = () => {
       )}
       {showTournamentWizard && <TournamentWizard />}
       {showTournamentDashboard && <TournamentDashboard />}
+      {showAwardsCeremony && <AwardsCeremony />}
     </div>
   );
 };
