@@ -1988,59 +1988,98 @@ const VEXLifetimeAchievementSystem = () => {
     );
   };
 
-  // Tournament Control Buttons
-  const TournamentButtons = () => (
+// Tournament Control Buttons
+const TournamentButtons = () => {
+  // Check for active tournament in current session
+  const activeTournamentExists = tournaments.some(t => 
+    t.sessionId === currentSession && 
+    t.status !== 'complete'
+  );
+
+  return (
     <div className="flex gap-2 flex-wrap">
+      {activeTournamentExists ? (
+        <>
+          <button
+            onClick={() => {
+              const ongoingTournament = tournaments.find(t => 
+                t.sessionId === currentSession && 
+                t.status !== 'complete'
+              );
+              setActiveTournament(ongoingTournament);
+              setShowTournamentDashboard(true);
+            }}
+            className="px-3 py-1 bg-green-500 rounded hover:bg-green-600 text-white font-semibold animate-pulse"
+          >
+            📊 Continue Tournament
+          </button>
+          <button
+            onClick={() => setShowTournamentWizard(true)}
+            className="px-3 py-1 bg-yellow-600 rounded hover:bg-yellow-700 text-white"
+          >
+            ➕ New Tournament
+          </button>
+        </>
+      ) : (
+        <button
+          onClick={() => setShowTournamentWizard(true)}
+          className="px-3 py-1 bg-yellow-500 rounded hover:bg-yellow-600 text-white font-semibold"
+        >
+          🏆 New Tournament
+        </button>
+      )}
+      
       <button
         onClick={() => setShowTeamManager(true)}
         className="px-3 py-1 bg-blue-600 rounded hover:bg-blue-700 text-white"
       >
         👥 Teams
       </button>
-      <button
-        onClick={() => setShowMatchEntry(true)}
-        className="px-3 py-1 bg-green-600 rounded hover:bg-green-700 text-white"
-      >
-        🤝 Teamwork
-      </button>
-      <button
-        onClick={() => {
-          setSkillsType("driver");
-          setShowSkillsEntry(true);
-        }}
-        className="px-3 py-1 bg-purple-600 rounded hover:bg-purple-700 text-white"
-      >
-        🎮 Driver Skills
-      </button>
-      <button
-        onClick={() => {
-          setSkillsType("autonomous");
-          setShowSkillsEntry(true);
-        }}
-        className="px-3 py-1 bg-indigo-600 rounded hover:bg-indigo-700 text-white"
-      >
-        🤖 Auton Skills
-      </button>
-      <button
-        onClick={() => setShowTournamentView(true)}
-        className="px-3 py-1 bg-orange-600 rounded hover:bg-orange-700 text-white"
-      >
-        📊 Tournament
-      </button>
-      <button
-        onClick={() => setShowAttendanceManager(true)}
-        className="px-3 py-1 bg-purple-500 text-white rounded hover:bg-purple-600"
-      >
-        📅 Attendance
-      </button>
-      <button
-        onClick={() => setShowAttendanceReport(true)}
-        className="px-3 py-1 bg-teal-600 rounded hover:bg-teal-700 text-white"
-      >
-        📈 Report
-      </button>
-    </div>
-  );
+    <button
+      onClick={() => setShowMatchEntry(true)}
+      className="px-3 py-1 bg-green-600 rounded hover:bg-green-700 text-white"
+    >
+      🤝 Teamwork
+    </button>
+    <button
+      onClick={() => {
+        setSkillsType("driver");
+        setShowSkillsEntry(true);
+      }}
+      className="px-3 py-1 bg-purple-600 rounded hover:bg-purple-700 text-white"
+    >
+      🎮 Driver Skills
+    </button>
+    <button
+      onClick={() => {
+        setSkillsType("autonomous");
+        setShowSkillsEntry(true);
+      }}
+      className="px-3 py-1 bg-indigo-600 rounded hover:bg-indigo-700 text-white"
+    >
+      🤖 Auton Skills
+    </button>
+    <button
+      onClick={() => setShowTournamentView(true)}
+      className="px-3 py-1 bg-orange-600 rounded hover:bg-orange-700 text-white"
+    >
+      📊 Tournament
+    </button>
+    <button
+      onClick={() => setShowAttendanceManager(true)}
+      className="px-3 py-1 bg-purple-500 text-white rounded hover:bg-purple-600"
+    >
+      📅 Attendance
+    </button>
+    <button
+      onClick={() => setShowAttendanceReport(true)}
+      className="px-3 py-1 bg-teal-600 rounded hover:bg-teal-700 text-white"
+    >
+      📈 Report
+    </button>
+  </div>
+);
+};
 
   const BulkAchievementAward = () => {
     const [selectedAchievement, setSelectedAchievement] = useState("");
@@ -3869,6 +3908,12 @@ const VEXLifetimeAchievementSystem = () => {
       customGameName: "",
     });
 
+      // Check for active tournament
+  const activeTournament = tournaments.find(t => 
+    t.sessionId === currentSession && 
+    t.status !== 'complete'
+  );
+
     // Get teams for current session
     const sessionTeams = teams.filter((t) => t.session === currentSession);
 
@@ -4044,11 +4089,37 @@ const VEXLifetimeAchievementSystem = () => {
       return trials;
     };
 
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-lg shadow-xl p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold">🏆 Create Tournament</h2>
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg shadow-xl p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+        {/* Add warning banner if active tournament exists */}
+        {activeTournament && (
+          <div className="mb-4 p-3 bg-orange-50 border border-orange-300 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-semibold text-orange-800">
+                  ⚠️ Active Tournament in Progress
+                </p>
+                <p className="text-sm text-orange-700">
+                  "{activeTournament.name}" is currently running. Creating a new tournament won't delete it.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowTournamentWizard(false);
+                  setActiveTournament(activeTournament);
+                  setShowTournamentDashboard(true);
+                }}
+                className="px-3 py-1 bg-orange-500 text-white rounded hover:bg-orange-600 text-sm"
+              >
+                Go to Tournament
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold">🏆 Create Tournament</h2>
             <button
               onClick={() => setShowTournamentWizard(false)}
               className="text-2xl hover:text-gray-600"
@@ -4428,6 +4499,629 @@ const VEXLifetimeAchievementSystem = () => {
               >
                 Create Tournament
               </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Tournament Dashboard Component
+  const TournamentDashboard = () => {
+    const currentTournament = activeTournament;
+    const [activeTab, setActiveTab] = useState("overview");
+
+    if (!currentTournament) {
+      return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6">
+            <p>No active tournament found.</p>
+            <button
+              onClick={() => setShowTournamentDashboard(false)}
+              className="mt-4 px-4 py-2 bg-gray-500 text-white rounded"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // Get tournament teams
+    const tournamentTeams = teams.filter((t) =>
+      currentTournament.teams.includes(t.id)
+    );
+
+    // Get tournament matches
+    const qualMatches = currentTournament.matches.quals || [];
+    const finalMatches = currentTournament.matches.finals || [];
+
+    // Calculate progress
+    const completedQuals = qualMatches.filter((m) => m.completed).length;
+    const totalQuals = qualMatches.length;
+    const qualProgress =
+      totalQuals > 0 ? (completedQuals / totalQuals) * 100 : 0;
+
+    const completedFinals = finalMatches.filter((m) => m.completed).length;
+    const totalFinals = finalMatches.length;
+    const finalProgress =
+      totalFinals > 0 ? (completedFinals / totalFinals) * 100 : 0;
+
+    // Get next match to run
+    const getNextMatch = () => {
+      if (currentTournament.status === "quals") {
+        return qualMatches.find((m) => !m.completed);
+      } else if (currentTournament.status === "finals") {
+        return finalMatches.find((m) => !m.completed);
+      }
+      return null;
+    };
+
+    const nextMatch = getNextMatch();
+
+    // Calculate rankings from qualification matches
+    const calculateQualRankings = () => {
+      const teamStats = {};
+
+      // Initialize stats for each team
+      currentTournament.teams.forEach((teamId) => {
+        teamStats[teamId] = {
+          teamId,
+          matches: 0,
+          totalScore: 0,
+          scores: [],
+          average: 0,
+        };
+      });
+
+      // Process completed qual matches
+      qualMatches
+        .filter((m) => m.completed)
+        .forEach((match) => {
+          if (currentTournament.format === "teamwork") {
+            // For teamwork, both teams get the same score
+            match.teams.forEach((teamId) => {
+              teamStats[teamId].matches++;
+              teamStats[teamId].totalScore += match.score;
+              teamStats[teamId].scores.push(match.score);
+            });
+          } else {
+            // For skills, individual scores
+            const teamId = match.teamId;
+            teamStats[teamId].matches++;
+            teamStats[teamId].totalScore += match.score;
+            teamStats[teamId].scores.push(match.score);
+          }
+        });
+
+// Calculate averages or highest based on scoring method
+Object.values(teamStats).forEach(stat => {
+  if (stat.matches > 0) {
+    if (currentTournament.format === 'teamwork') {
+      // Teamwork always uses average
+      stat.average = (stat.totalScore / stat.matches).toFixed(1);
+    } else {
+      // Skills uses configured scoring method
+      if (currentTournament.config.scoringMethod === 'average') {
+        stat.average = (stat.totalScore / stat.matches).toFixed(1);
+      } else {
+        // Highest score
+        stat.average = Math.max(...stat.scores);
+      }
+    }
+  }
+});
+
+      // Sort by average/highest score
+      return Object.values(teamStats).sort((a, b) => b.average - a.average);
+    };
+
+    const rankings = calculateQualRankings();
+
+// Generate finals matches based on rankings
+const generateFinals = () => {
+  if (currentTournament.format !== 'teamwork') {
+    alert('Finals are only for teamwork tournaments');
+    return;
+  }
+
+  const finalMatches = [];
+  let matchNumber = 1;
+
+  // Pair teams: 1st+2nd, 3rd+4th, etc.
+  // But add them in reverse order (lowest ranks first)
+  const pairings = [];
+  for (let i = 0; i < rankings.length - 1; i += 2) {
+    pairings.push({
+      teams: [rankings[i].teamId, rankings[i + 1].teamId],
+      rankSum: (i + 1) + (i + 2) // Sum of ranks for ordering
+    });
+  }
+
+  // Sort by rank sum (highest first = lowest ranked teams)
+  pairings.sort((a, b) => b.rankSum - a.rankSum);
+
+  // Create matches in order
+  pairings.forEach(pairing => {
+    finalMatches.push({
+      id: `final_${Date.now()}_${matchNumber}`,
+      matchNumber: `F${matchNumber}`,
+      teams: pairing.teams,
+      score: null,
+      completed: false
+    });
+    matchNumber++;
+  });
+
+  // If odd number of teams, last team gets a bye
+  if (rankings.length % 2 === 1) {
+    console.log('Odd number of teams - last team needs special handling');
+  }
+
+  // Update tournament
+  const updatedTournament = {
+    ...currentTournament,
+    matches: {
+      ...currentTournament.matches,
+      finals: finalMatches
+    },
+    status: 'finals'
+  };
+
+  setTournaments(tournaments.map(t => 
+    t.id === currentTournament.id ? updatedTournament : t
+  ));
+  setActiveTournament(updatedTournament);
+};
+
+    // Complete tournament and go to awards
+    const completeTournament = () => {
+      // Calculate final rankings
+      const finalRankings = [];
+
+      if (currentTournament.format === "teamwork") {
+        // For teamwork, rank by finals scores
+        const finalScores = {};
+
+        finalMatches
+          .filter((m) => m.completed)
+          .forEach((match) => {
+            match.teams.forEach((teamId) => {
+              if (!finalScores[teamId] || match.score > finalScores[teamId]) {
+                finalScores[teamId] = match.score;
+              }
+            });
+          });
+
+        // Convert to rankings array
+        Object.entries(finalScores).forEach(([teamId, score]) => {
+          finalRankings.push({
+            teamId: parseInt(teamId),
+            score,
+            rank: 0, // Will be set after sorting
+          });
+        });
+
+        // Sort and assign ranks
+        finalRankings.sort((a, b) => b.score - a.score);
+        finalRankings.forEach((ranking, index) => {
+          ranking.rank = index + 1;
+        });
+      } else {
+        // For skills, use qual rankings as final rankings
+        rankings.forEach((stat, index) => {
+          finalRankings.push({
+            teamId: stat.teamId,
+            score: parseFloat(stat.average),
+            rank: index + 1,
+          });
+        });
+      }
+
+      // Update tournament with final results
+      const updatedTournament = {
+        ...currentTournament,
+        status: "complete",
+        results: {
+          ...currentTournament.results,
+          qualRankings: rankings,
+          finalRankings: finalRankings,
+        },
+      };
+
+      setTournaments(
+        tournaments.map((t) =>
+          t.id === currentTournament.id ? updatedTournament : t
+        )
+      );
+      setActiveTournament(updatedTournament);
+
+      // Show awards ceremony
+      setShowTournamentDashboard(false);
+      setShowAwardsCeremony(true);
+    };
+
+    // Handle match score entry
+    const handleMatchScore = (matchId, score) => {
+      const isQual = currentTournament.status === "quals";
+      const matches = isQual ? qualMatches : finalMatches;
+
+      const updatedMatches = matches.map((m) =>
+        m.id === matchId ? { ...m, score: parseInt(score), completed: true } : m
+      );
+
+      const updatedTournament = {
+        ...currentTournament,
+        matches: {
+          ...currentTournament.matches,
+          [isQual ? "quals" : "finals"]: updatedMatches,
+        },
+      };
+
+      setTournaments(
+        tournaments.map((t) =>
+          t.id === currentTournament.id ? updatedTournament : t
+        )
+      );
+      setActiveTournament(updatedTournament);
+
+      // Save to teamworkMatches for history
+      if (currentTournament.format === "teamwork") {
+        const match = updatedMatches.find((m) => m.id === matchId);
+        handleSaveTeamworkMatch({
+          id: Date.now(),
+          session: currentSession,
+          matchType: isQual ? "qual" : "final",
+          tournamentId: currentTournament.id,
+          matchNumber: match.matchNumber,
+          teams: match.teams,
+          score: parseInt(score),
+          timestamp: new Date().toISOString(),
+        });
+      }
+    };
+
+    // Render match card
+    const MatchCard = ({ match, showScore = true }) => {
+      const [score, setScore] = useState(match.score || "");
+      const [isEditing, setIsEditing] = useState(false);
+
+      const matchTeams =
+        currentTournament.format === "teamwork"
+          ? tournamentTeams.filter((t) => match.teams.includes(t.id))
+          : [tournamentTeams.find((t) => t.id === match.teamId)];
+
+      const handleSave = () => {
+        if (score) {
+          handleMatchScore(match.id, score);
+          setIsEditing(false);
+        }
+      };
+
+      return (
+        <div
+          className={`p-4 rounded-lg border ${
+            match.completed
+              ? "bg-green-50 border-green-300"
+              : "bg-white border-gray-300"
+          }`}
+        >
+          <div className="flex justify-between items-center">
+            <div>
+              <div className="font-semibold text-lg">{match.matchNumber}</div>
+              <div className="text-sm text-gray-600">
+                {currentTournament.format === "teamwork"
+                  ? matchTeams.map((t) => `${t.number}: ${t.name}`).join(" + ")
+                  : `${matchTeams[0].number}: ${matchTeams[0].name} - Attempt ${match.attempt}`}
+              </div>
+            </div>
+            {showScore && (
+              <div className="text-right">
+                {match.completed && !isEditing ? (
+                  <div>
+                    <div className="text-2xl font-bold text-blue-600">
+                      {match.score}
+                    </div>
+                    <button
+                      onClick={() => setIsEditing(true)}
+                      className="text-xs text-gray-500 hover:text-gray-700"
+                    >
+                      Edit
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      value={score}
+                      onChange={(e) => setScore(e.target.value)}
+                      placeholder="Score"
+                      className="w-20 px-2 py-1 border rounded text-center"
+                      autoFocus
+                    />
+                    <button
+                      onClick={handleSave}
+                      disabled={!score}
+                      className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 disabled:bg-gray-300"
+                    >
+                      Save
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+          {/* Header */}
+          <div className="p-6 border-b">
+            <div className="flex justify-between items-start">
+              <div>
+                <h2 className="text-2xl font-bold flex items-center gap-2">
+                  🏆 {currentTournament.name}
+                </h2>
+                <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
+                  <span className="flex items-center gap-1">
+                    <span className="font-medium">Format:</span>
+                    {currentTournament.format === "teamwork"
+                      ? "🤝 Teamwork"
+                      : currentTournament.format === "driver"
+                      ? "🎮 Driver Skills"
+                      : currentTournament.format === "autonomous"
+                      ? "🤖 Autonomous"
+                      : `⚙️ ${currentTournament.config.customGameName}`}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="font-medium">Status:</span>
+                    <span
+                      className={`px-2 py-1 rounded text-xs font-medium ${
+                        currentTournament.status === "quals"
+                          ? "bg-blue-100 text-blue-800"
+                          : currentTournament.status === "finals"
+                          ? "bg-purple-100 text-purple-800"
+                          : "bg-green-100 text-green-800"
+                      }`}
+                    >
+                      {currentTournament.status.toUpperCase()}
+                    </span>
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowTournamentDashboard(false)}
+                className="text-2xl hover:text-gray-600"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Progress Bars */}
+            <div className="mt-4 space-y-2">
+              <div>
+                <div className="flex justify-between text-sm mb-1">
+                  <span>Qualification Matches</span>
+                  <span>
+                    {completedQuals}/{totalQuals}
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-blue-500 h-2 rounded-full transition-all"
+                    style={{ width: `${qualProgress}%` }}
+                  />
+                </div>
+              </div>
+              {currentTournament.format === "teamwork" && totalFinals > 0 && (
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span>Final Matches</span>
+                    <span>
+                      {completedFinals}/{totalFinals}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className="bg-purple-500 h-2 rounded-full transition-all"
+                      style={{ width: `${finalProgress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Tabs */}
+          <div className="flex border-b">
+            <button
+              onClick={() => setActiveTab("overview")}
+              className={`px-6 py-3 font-medium ${
+                activeTab === "overview"
+                  ? "border-b-2 border-blue-500 text-blue-600"
+                  : "text-gray-600 hover:text-gray-800"
+              }`}
+            >
+              Overview
+            </button>
+            <button
+              onClick={() => setActiveTab("matches")}
+              className={`px-6 py-3 font-medium ${
+                activeTab === "matches"
+                  ? "border-b-2 border-blue-500 text-blue-600"
+                  : "text-gray-600 hover:text-gray-800"
+              }`}
+            >
+              Matches
+            </button>
+            <button
+              onClick={() => setActiveTab("rankings")}
+              className={`px-6 py-3 font-medium ${
+                activeTab === "rankings"
+                  ? "border-b-2 border-blue-500 text-blue-600"
+                  : "text-gray-600 hover:text-gray-800"
+              }`}
+            >
+              Rankings
+            </button>
+          </div>
+
+          {/* Content Area */}
+          <div className="flex-1 overflow-y-auto p-6">
+            {/* Overview Tab */}
+            {activeTab === "overview" && (
+              <div className="space-y-6">
+                {/* Next Match */}
+                {nextMatch && (
+                  <div className="bg-blue-50 p-6 rounded-lg">
+                    <h3 className="text-lg font-semibold mb-3">
+                      🎯 Next Match
+                    </h3>
+                    <MatchCard match={nextMatch} />
+                  </div>
+                )}
+
+                {/* Quick Stats */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <div className="text-3xl font-bold text-blue-600">
+                      {tournamentTeams.length}
+                    </div>
+                    <div className="text-sm text-gray-600">Teams Competing</div>
+                  </div>
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <div className="text-3xl font-bold text-green-600">
+                      {completedQuals + completedFinals}
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      Matches Complete
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <div className="text-3xl font-bold text-purple-600">
+                      {totalQuals +
+                        totalFinals -
+                        completedQuals -
+                        completedFinals}
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      Matches Remaining
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-3 justify-center">
+                  {currentTournament.status === "quals" &&
+                    qualProgress === 100 && (
+                      <button
+                        onClick={generateFinals}
+                        className="px-6 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600 font-semibold"
+                      >
+                        Generate Finals Matches
+                      </button>
+                    )}
+                  {((currentTournament.status === "finals" &&
+                    finalProgress === 100) ||
+                    (currentTournament.format !== "teamwork" &&
+                      qualProgress === 100)) && (
+                    <button
+                      onClick={completeTournament}
+                      className="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 font-semibold"
+                    >
+                      Complete Tournament & Awards
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Matches Tab */}
+            {activeTab === "matches" && (
+              <div className="space-y-6">
+                {currentTournament.status === "quals" ||
+                currentTournament.status === "complete" ? (
+                  <div>
+                    <h3 className="text-lg font-semibold mb-3">
+                      Qualification Matches
+                    </h3>
+                    <div className="space-y-2">
+                      {qualMatches.map((match) => (
+                        <MatchCard key={match.id} match={match} />
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                {(currentTournament.status === "finals" ||
+                  (currentTournament.status === "complete" &&
+                    finalMatches.length > 0)) && (
+                  <div>
+                    <h3 className="text-lg font-semibold mb-3">
+                      Final Matches
+                    </h3>
+                    <div className="space-y-2">
+                      {finalMatches.map((match) => (
+                        <MatchCard key={match.id} match={match} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Rankings Tab */}
+            {activeTab === "rankings" && (
+              <div>
+<h3 className="text-lg font-semibold mb-4">
+  Current Rankings
+  {currentTournament.format === 'teamwork' 
+    ? ' (By Average Score)' 
+    : currentTournament.config.scoringMethod === 'average' 
+      ? ' (By Average)' 
+      : ' (By Highest Score)'}
+</h3>
+                <div className="space-y-2">
+                  {rankings.map((stat, index) => {
+                    const team = tournamentTeams.find(
+                      (t) => t.id === stat.teamId
+                    );
+                    if (!team) return null;
+
+                    return (
+                      <div
+                        key={stat.teamId}
+                        className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="text-2xl font-bold text-gray-400 w-12">
+                            #{index + 1}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-lg">
+                              {team.number}: {team.name}
+                            </div>
+                            <div className="text-sm text-gray-600">
+                              {team.studentNames.join(", ")}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-2xl font-bold">
+                            {stat.average}
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            {stat.matches} matches
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             )}
           </div>
         </div>
@@ -4947,6 +5641,13 @@ const VEXLifetimeAchievementSystem = () => {
                     </option>
                   ))}
               </select>
+
+                {/* Add tournament status badge */}
+  {tournaments.some(t => t.sessionId === currentSession && t.status !== 'complete') && (
+    <div className="px-2 py-1 bg-green-400 text-white rounded text-sm animate-pulse">
+      Tournament Active
+    </div>
+  )}
               <div className="flex gap-2">
                 <button
                   onClick={() => setCurrentView("dashboard")}
@@ -5184,6 +5885,7 @@ const VEXLifetimeAchievementSystem = () => {
         />
       )}
       {showTournamentWizard && <TournamentWizard />}
+      {showTournamentDashboard && <TournamentDashboard />}
     </div>
   );
 };
