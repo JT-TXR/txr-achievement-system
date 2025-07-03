@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { initializeTestData } from "./testData";
 
 const VEXLifetimeAchievementSystem = () => {
   // Enhanced data structure with lifetime and session tracking
@@ -283,6 +284,8 @@ const VEXLifetimeAchievementSystem = () => {
 
   // Load data on mount
   useEffect(() => {
+    initializeTestData();
+
     const savedStudents = localStorage.getItem("vexLifetimeStudents");
     const savedAchievements = localStorage.getItem("vexAchievements");
     const savedSessions = localStorage.getItem("vexSessions");
@@ -5141,201 +5144,207 @@ const VEXLifetimeAchievementSystem = () => {
     );
   };
 
-// Awards Ceremony Component
-const AwardsCeremony = () => {
-  const tournament = activeTournament;
-  const [currentReveal, setCurrentReveal] = useState(0);
-  const [showConfetti, setShowConfetti] = useState(false);
-  const [awardedAchievements, setAwardedAchievements] = useState([]);
-  const [awardedXP, setAwardedXP] = useState({});
+  // Awards Ceremony Component
+  const AwardsCeremony = () => {
+    const tournament = activeTournament;
+    const [currentReveal, setCurrentReveal] = useState(0);
+    const [showConfetti, setShowConfetti] = useState(false);
+    const [awardedAchievements, setAwardedAchievements] = useState([]);
+    const [awardedXP, setAwardedXP] = useState({});
 
-  if (!tournament || tournament.status !== "complete") {
-    return null;
-  }
-
-  // Get tournament teams and students
-  const tournamentTeams = teams.filter((t) =>
-    tournament.teams.includes(t.id)
-  );
-  const finalRankings = tournament.results.finalRankings || [];
-
-  // Calculate rank groups and total here (MOVED OUTSIDE THE IIFE)
-  const rankGroups = {};
-  finalRankings.forEach((ranking) => {
-    if (!rankGroups[ranking.rank]) {
-      rankGroups[ranking.rank] = [];
+    if (!tournament || tournament.status !== "complete") {
+      return null;
     }
-    rankGroups[ranking.rank].push(ranking);
-  });
-  const totalRankGroups = Object.keys(rankGroups).length;
 
-  // Define achievements to award
-  const tournamentAchievements = {
-    1: {
-      name: "Tournament Champion",
-      icon: "🏆",
-      xp: 100,
-      description: "Won 1st place in a tournament!",
-    },
-    2: {
-      name: "Silver Medal",
-      icon: "🥈",
-      xp: 75,
-      description: "Won 2nd place in a tournament!",
-    },
-    3: {
-      name: "Bronze Medal",
-      icon: "🥉",
-      xp: 50,
-      description: "Won 3rd place in a tournament!",
-    },
-    participation: {
-      name: "Tournament Competitor",
-      icon: "🎯",
-      xp: 25,
-      description: "Participated in a tournament!",
-    },
-  };
+    // Get tournament teams and students
+    const tournamentTeams = teams.filter((t) =>
+      tournament.teams.includes(t.id)
+    );
+    const finalRankings = tournament.results.finalRankings || [];
 
-  // Award achievements and XP
-  const processAwards = () => {
-    // Check if already processed
-    if (tournament.awardsProcessed) return;
-
-    const awards = [];
-    const xpAwards = {};
-
+    // Calculate rank groups and total here (MOVED OUTSIDE THE IIFE)
+    const rankGroups = {};
     finalRankings.forEach((ranking) => {
-      const team = tournamentTeams.find((t) => t.id === ranking.teamId);
-      if (!team) return;
-
-      // Determine achievement based on rank
-      let achievement = null;
-      if (ranking.rank <= 3) {
-        achievement = tournamentAchievements[ranking.rank];
-      } else {
-        achievement = tournamentAchievements.participation;
+      if (!rankGroups[ranking.rank]) {
+        rankGroups[ranking.rank] = [];
       }
-
-      // Award to each team member
-      team.studentIds.forEach((studentId) => {
-        // Track what we're awarding
-        awards.push({
-          studentId,
-          achievement,
-          teamName: team.name,
-          rank: ranking.rank,
-        });
-
-        // Award XP
-        if (!xpAwards[studentId]) {
-          xpAwards[studentId] = 0;
-        }
-        xpAwards[studentId] += achievement.xp;
-
-        // Actually award the XP (30% goes to lifetime)
-        awardXP(studentId, achievement.xp, false);
-      });
+      rankGroups[ranking.rank].push(ranking);
     });
+    const totalRankGroups = Object.keys(rankGroups).length;
 
-    setAwardedAchievements(awards);
-    setAwardedXP(xpAwards);
-
-    // Mark as processed
-    const updatedTournament = {
-      ...tournament,
-      awardsProcessed: true,
+    // Define achievements to award
+    const tournamentAchievements = {
+      1: {
+        name: "Tournament Champion",
+        icon: "🏆",
+        xp: 100,
+        description: "Won 1st place in a tournament!",
+      },
+      2: {
+        name: "Silver Medal",
+        icon: "🥈",
+        xp: 75,
+        description: "Won 2nd place in a tournament!",
+      },
+      3: {
+        name: "Bronze Medal",
+        icon: "🥉",
+        xp: 50,
+        description: "Won 3rd place in a tournament!",
+      },
+      participation: {
+        name: "Tournament Competitor",
+        icon: "🎯",
+        xp: 25,
+        description: "Participated in a tournament!",
+      },
     };
 
-    setTournaments(
-      tournaments.map((t) => (t.id === tournament.id ? updatedTournament : t))
-    );
-    setActiveTournament(updatedTournament);
-  };
+    // Award achievements and XP
+    const processAwards = () => {
+      // Check if already processed
+      if (tournament.awardsProcessed) return;
 
-  // Process awards on mount
-  useEffect(() => {
-    processAwards();
+      const awards = [];
+      const xpAwards = {};
 
-    // Start reveal animation
-    const timer = setTimeout(() => {
-      setCurrentReveal(1);
-    }, 500);
+      finalRankings.forEach((ranking) => {
+        const team = tournamentTeams.find((t) => t.id === ranking.teamId);
+        if (!team) return;
 
-    return () => clearTimeout(timer);
-  }, []);
+        // Determine achievement based on rank
+        let achievement = null;
+        if (ranking.rank <= 3) {
+          achievement = tournamentAchievements[ranking.rank];
+        } else {
+          achievement = tournamentAchievements.participation;
+        }
 
-  // Handle reveal steps
-  const handleNextReveal = () => {
-    if (currentReveal < totalRankGroups) {
-      const nextReveal = currentReveal + 1;
-      setCurrentReveal(nextReveal);
-      
-      // Show confetti when revealing 1st place (champions)
-      // This happens when we've revealed all ranks
-      if (nextReveal === totalRankGroups) {
-        setTimeout(() => {
-          setShowConfetti(true);
-          setTimeout(() => setShowConfetti(false), 5000);
-        }, 500); // Small delay for dramatic effect
+        // Award to each team member
+        team.studentIds.forEach((studentId) => {
+          // Track what we're awarding
+          awards.push({
+            studentId,
+            achievement,
+            teamName: team.name,
+            rank: ranking.rank,
+          });
+
+          // Award XP
+          if (!xpAwards[studentId]) {
+            xpAwards[studentId] = 0;
+          }
+          xpAwards[studentId] += achievement.xp;
+
+          // Actually award the XP (30% goes to lifetime)
+          awardXP(studentId, achievement.xp, false);
+        });
+      });
+
+      setAwardedAchievements(awards);
+      setAwardedXP(xpAwards);
+
+      // Mark as processed
+      const updatedTournament = {
+        ...tournament,
+        awardsProcessed: true,
+      };
+
+      setTournaments(
+        tournaments.map((t) => (t.id === tournament.id ? updatedTournament : t))
+      );
+      setActiveTournament(updatedTournament);
+    };
+
+    // Process awards on mount
+    useEffect(() => {
+      processAwards();
+
+      // Start reveal animation
+      const timer = setTimeout(() => {
+        setCurrentReveal(1);
+      }, 500);
+
+      return () => clearTimeout(timer);
+    }, []);
+
+    // Handle reveal steps
+    const handleNextReveal = () => {
+      if (currentReveal < totalRankGroups) {
+        const nextReveal = currentReveal + 1;
+        setCurrentReveal(nextReveal);
+
+        // Show confetti when revealing 1st place (champions)
+        // This happens when we've revealed all ranks
+        if (nextReveal === totalRankGroups) {
+          setTimeout(() => {
+            setShowConfetti(true);
+            setTimeout(() => setShowConfetti(false), 5000);
+          }, 500); // Small delay for dramatic effect
+        }
       }
-    }
-  };
-
-  const handleComplete = () => {
-    // Mark tournament as awarded
-    const updatedTournament = {
-      ...tournament,
-      awardsPresented: true,
     };
 
-    setTournaments(
-      tournaments.map((t) => (t.id === tournament.id ? updatedTournament : t))
-    );
+    const handleComplete = () => {
+      // Mark tournament as awarded
+      const updatedTournament = {
+        ...tournament,
+        awardsPresented: true,
+      };
 
-    setShowAwardsCeremony(false);
-    setActiveTournament(null);
-  };
+      setTournaments(
+        tournaments.map((t) => (t.id === tournament.id ? updatedTournament : t))
+      );
 
-  const Confetti = () => {
-    if (!showConfetti) return null;
-  
-    return (
-      <div 
-        className="fixed inset-0 pointer-events-none overflow-hidden" 
-        style={{ zIndex: 9999 }}
-      >
-        {[...Array(50)].map((_, i) => {
-          const left = Math.random() * 100;
-          const delay = Math.random() * 3;
-          const duration = 3 + Math.random() * 2;
-          
-          return (
-            <div
-              key={i}
-              className="absolute"
-              style={{
-                left: `${left}%`,
-                top: '-10%',
-                animation: `fall ${duration}s linear ${delay}s forwards`,
-                WebkitAnimation: `fall ${duration}s linear ${delay}s forwards`,
-              }}
-            >
-              <div 
-                className="text-4xl"
-                style={{ 
-                  animation: `spin ${1 + Math.random() * 2}s linear infinite`,
-                  WebkitAnimation: `spin ${1 + Math.random() * 2}s linear infinite`,
+      setShowAwardsCeremony(false);
+      setActiveTournament(null);
+    };
+
+    const Confetti = () => {
+      if (!showConfetti) return null;
+
+      return (
+        <div
+          className="fixed inset-0 pointer-events-none overflow-hidden"
+          style={{ zIndex: 9999 }}
+        >
+          {[...Array(50)].map((_, i) => {
+            const left = Math.random() * 100;
+            const delay = Math.random() * 3;
+            const duration = 3 + Math.random() * 2;
+
+            return (
+              <div
+                key={i}
+                className="absolute"
+                style={{
+                  left: `${left}%`,
+                  top: "-10%",
+                  animation: `fall ${duration}s linear ${delay}s forwards`,
+                  WebkitAnimation: `fall ${duration}s linear ${delay}s forwards`,
                 }}
               >
-                {['🎉', '🎊', '⭐', '✨', '🏆'][Math.floor(Math.random() * 5)]}
+                <div
+                  className="text-4xl"
+                  style={{
+                    animation: `spin ${1 + Math.random() * 2}s linear infinite`,
+                    WebkitAnimation: `spin ${
+                      1 + Math.random() * 2
+                    }s linear infinite`,
+                  }}
+                >
+                  {
+                    ["🎉", "🎊", "⭐", "✨", "🏆"][
+                      Math.floor(Math.random() * 5)
+                    ]
+                  }
+                </div>
               </div>
-            </div>
-          );
-        })}
-        
-        {/* Inline keyframes as a fallback */}
-        <style>{`
+            );
+          })}
+
+          {/* Inline keyframes as a fallback */}
+          <style>{`
           @keyframes fall {
             from {
               transform: translateY(0);
@@ -5356,202 +5365,205 @@ const AwardsCeremony = () => {
             }
           }
         `}</style>
-      </div>
-    );
-  };
-  return (
-    <>
-      {/* Confetti rendered at top level with high z-index */}
-      <Confetti />
-      
-      <div
-        className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4"
-        style={{ zIndex: 50 }}
-      >
+        </div>
+      );
+    };
+    return (
+      <>
+        {/* Confetti rendered at top level with high z-index */}
+        <Confetti />
+
         <div
-          className="bg-white rounded-lg shadow-xl p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto relative"
-          style={{ zIndex: 60 }}
+          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4"
+          style={{ zIndex: 50 }}
         >
-          {/* Header */}
-          <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold mb-2">🏆 Tournament Results</h1>
-            <h2 className="text-2xl text-gray-600">{tournament.name}</h2>
-            <p className="text-gray-500 mt-2">
-              {tournament.format === "teamwork"
-                ? "Teamwork Challenge"
-                : tournament.format === "driver"
-                ? "Driver Skills"
-                : tournament.format === "autonomous"
-                ? "Autonomous Skills"
-                : tournament.config.customGameName}
-            </p>
-          </div>
+          <div
+            className="bg-white rounded-lg shadow-xl p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto relative"
+            style={{ zIndex: 60 }}
+          >
+            {/* Header */}
+            <div className="text-center mb-8">
+              <h1 className="text-4xl font-bold mb-2">🏆 Tournament Results</h1>
+              <h2 className="text-2xl text-gray-600">{tournament.name}</h2>
+              <p className="text-gray-500 mt-2">
+                {tournament.format === "teamwork"
+                  ? "Teamwork Challenge"
+                  : tournament.format === "driver"
+                  ? "Driver Skills"
+                  : tournament.format === "autonomous"
+                  ? "Autonomous Skills"
+                  : tournament.config.customGameName}
+              </p>
+            </div>
 
-          {/* Results Display - Show by Alliance */}
-          <div className="space-y-6 mb-8">
-            {(() => {
-              // Sort by rank ASCENDING so best ranks (1) are at the top of the display
-              const sortedRanks = Object.keys(rankGroups)
-                .map(Number)
-                .sort((a, b) => a - b); // 1, 2, 3, 4...
+            {/* Results Display - Show by Alliance */}
+            <div className="space-y-6 mb-8">
+              {(() => {
+                // Sort by rank ASCENDING so best ranks (1) are at the top of the display
+                const sortedRanks = Object.keys(rankGroups)
+                  .map(Number)
+                  .sort((a, b) => a - b); // 1, 2, 3, 4...
 
-              return sortedRanks.map((rank, index) => {
-                const alliance = rankGroups[rank];
-                
-                // Calculate if this rank should be revealed
-                // We want to reveal from highest rank number (worst) to lowest (best)
-                const totalRanks = sortedRanks.length;
-                const shouldReveal = (totalRanks - rank) < currentReveal;
-                const isCurrentReveal = shouldReveal && (totalRanks - rank) === (currentReveal - 1);
+                return sortedRanks.map((rank, index) => {
+                  const alliance = rankGroups[rank];
 
-                return (
-                  <div
-                    key={rank}
-                    className={`transform transition-all duration-1000 ${
-                      shouldReveal
-                        ? "translate-x-0 opacity-100"
-                        : "translate-x-full opacity-0"
-                    } ${isCurrentReveal ? "scale-105" : ""}`}
-                  >
+                  // Calculate if this rank should be revealed
+                  // We want to reveal from highest rank number (worst) to lowest (best)
+                  const totalRanks = sortedRanks.length;
+                  const shouldReveal = totalRanks - rank < currentReveal;
+                  const isCurrentReveal =
+                    shouldReveal && totalRanks - rank === currentReveal - 1;
+
+                  return (
                     <div
-                      className={`p-6 rounded-lg border-2 ${
-                        rank === 1
-                          ? "border-yellow-400 bg-yellow-50"
-                          : rank === 2
-                          ? "border-gray-400 bg-gray-50"
-                          : rank === 3
-                          ? "border-orange-400 bg-orange-50"
-                          : "border-gray-300 bg-white"
-                      }`}
+                      key={rank}
+                      className={`transform transition-all duration-1000 ${
+                        shouldReveal
+                          ? "translate-x-0 opacity-100"
+                          : "translate-x-full opacity-0"
+                      } ${isCurrentReveal ? "scale-105" : ""}`}
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className="text-5xl">
-                            {rank === 1
-                              ? "🥇"
-                              : rank === 2
-                              ? "🥈"
-                              : rank === 3
-                              ? "🥉"
-                              : `#${rank}`}
-                          </div>
-                          <div>
-                            <h3 className="text-xl font-bold mb-1">
+                      <div
+                        className={`p-6 rounded-lg border-2 ${
+                          rank === 1
+                            ? "border-yellow-400 bg-yellow-50"
+                            : rank === 2
+                            ? "border-gray-400 bg-gray-50"
+                            : rank === 3
+                            ? "border-orange-400 bg-orange-50"
+                            : "border-gray-300 bg-white"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <div className="text-5xl">
                               {rank === 1
-                                ? "Champions"
+                                ? "🥇"
                                 : rank === 2
-                                ? "2nd Place"
+                                ? "🥈"
                                 : rank === 3
-                                ? "3rd Place"
-                                : `${rank}th Place`}
-                            </h3>
-                            <div className="space-y-1">
-                              {alliance.map((ranking) => {
-                                const team = tournamentTeams.find(
-                                  (t) => t.id === ranking.teamId
-                                );
-                                if (!team) return null;
-                                
-                                return (
-                                  <div
-                                    key={ranking.teamId}
-                                    className="text-gray-700"
-                                  >
-                                    <span className="font-semibold">
-                                      {team.number}: {team.name}
-                                    </span>
-                                    <span className="text-sm text-gray-500 ml-2">
-                                      ({team.studentNames.join(", ")})
-                                    </span>
-                                  </div>
-                                );
-                              })}
+                                ? "🥉"
+                                : `#${rank}`}
+                            </div>
+                            <div>
+                              <h3 className="text-xl font-bold mb-1">
+                                {rank === 1
+                                  ? "Champions"
+                                  : rank === 2
+                                  ? "2nd Place"
+                                  : rank === 3
+                                  ? "3rd Place"
+                                  : `${rank}th Place`}
+                              </h3>
+                              <div className="space-y-1">
+                                {alliance.map((ranking) => {
+                                  const team = tournamentTeams.find(
+                                    (t) => t.id === ranking.teamId
+                                  );
+                                  if (!team) return null;
+
+                                  return (
+                                    <div
+                                      key={ranking.teamId}
+                                      className="text-gray-700"
+                                    >
+                                      <span className="font-semibold">
+                                        {team.number}: {team.name}
+                                      </span>
+                                      <span className="text-sm text-gray-500 ml-2">
+                                        ({team.studentNames.join(", ")})
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-3xl font-bold text-blue-600">
+                              {alliance[0].score}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {tournament.format === "teamwork"
+                                ? "Finals Score"
+                                : "Score"}
                             </div>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <div className="text-3xl font-bold text-blue-600">
-                            {alliance[0].score}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {tournament.format === "teamwork" 
-                              ? "Finals Score" 
-                              : "Score"}
-                          </div>
-                        </div>
-                      </div>
 
-                      {/* Show XP Award */}
-                      {isCurrentReveal && (
-                        <div className="mt-4 pt-4 border-t border-gray-300">
-                          <div className="flex items-center justify-center gap-2 text-green-600 animate-bounce">
-                            <span className="text-2xl">✨</span>
-                            <span className="font-bold text-lg">
-                              +
-                              {
-                                tournamentAchievements[
-                                  rank <= 3 ? rank : "participation"
-                                ].xp
-                              }{" "}
-                              XP each
-                            </span>
-                            <span className="text-2xl">✨</span>
+                        {/* Show XP Award */}
+                        {isCurrentReveal && (
+                          <div className="mt-4 pt-4 border-t border-gray-300">
+                            <div className="flex items-center justify-center gap-2 text-green-600 animate-bounce">
+                              <span className="text-2xl">✨</span>
+                              <span className="font-bold text-lg">
+                                +
+                                {
+                                  tournamentAchievements[
+                                    rank <= 3 ? rank : "participation"
+                                  ].xp
+                                }{" "}
+                                XP each
+                              </span>
+                              <span className="text-2xl">✨</span>
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
+                  );
+                });
+              })()}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex justify-center gap-4">
+              {currentReveal < totalRankGroups ? (
+                <button
+                  onClick={handleNextReveal}
+                  className="px-8 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-semibold text-lg animate-pulse"
+                >
+                  {currentReveal === totalRankGroups - 1
+                    ? "Reveal Champions! 🏆"
+                    : "Reveal Next →"}
+                </button>
+              ) : (
+                <button
+                  onClick={handleComplete}
+                  className="px-8 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 font-semibold text-lg"
+                >
+                  Complete Ceremony ✓
+                </button>
+              )}
+            </div>
+
+            {/* Summary of Awards (shown after all reveals) */}
+            {currentReveal >= totalRankGroups &&
+              awardedAchievements.length > 0 && (
+                <div className="mt-8 p-6 bg-blue-50 rounded-lg">
+                  <h3 className="font-bold text-lg mb-3">📊 Awards Summary</h3>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    {students
+                      .filter((s) => awardedXP[s.id])
+                      .map((student) => (
+                        <div
+                          key={student.id}
+                          className="flex items-center justify-between"
+                        >
+                          <span>{student.name}</span>
+                          <span className="font-bold text-green-600">
+                            +{awardedXP[student.id]} XP
+                          </span>
+                        </div>
+                      ))}
                   </div>
-                );
-              });
-            })()}
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex justify-center gap-4">
-            {currentReveal < totalRankGroups ? (
-              <button
-                onClick={handleNextReveal}
-                className="px-8 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-semibold text-lg animate-pulse"
-              >
-                {currentReveal === totalRankGroups - 1 ? "Reveal Champions! 🏆" : "Reveal Next →"}
-              </button>
-            ) : (
-              <button
-                onClick={handleComplete}
-                className="px-8 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 font-semibold text-lg"
-              >
-                Complete Ceremony ✓
-              </button>
-            )}
-          </div>
-
-          {/* Summary of Awards (shown after all reveals) */}
-          {currentReveal >= totalRankGroups &&
-            awardedAchievements.length > 0 && (
-              <div className="mt-8 p-6 bg-blue-50 rounded-lg">
-                <h3 className="font-bold text-lg mb-3">📊 Awards Summary</h3>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  {students
-                    .filter((s) => awardedXP[s.id])
-                    .map((student) => (
-                      <div
-                        key={student.id}
-                        className="flex items-center justify-between"
-                      >
-                        <span>{student.name}</span>
-                        <span className="font-bold text-green-600">
-                          +{awardedXP[student.id]} XP
-                        </span>
-                      </div>
-                    ))}
                 </div>
-              </div>
-            )}
+              )}
+          </div>
         </div>
-      </div>
-    </>
-  );
-};
+      </>
+    );
+  };
 
   // Student Card Component
   const StudentCard = ({ student }) => {
