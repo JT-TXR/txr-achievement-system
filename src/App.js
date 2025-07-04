@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { initializeTestData } from "./testData";
+import NavigationBar from './NavigationBar';
 
 const VEXLifetimeAchievementSystem = () => {
   // Enhanced data structure with lifetime and session tracking
@@ -252,6 +253,10 @@ const VEXLifetimeAchievementSystem = () => {
   const [showTournamentHistory, setShowTournamentHistory] = useState(false);
   const [showAwardsCeremony, setShowAwardsCeremony] = useState(false);
   const [selectedHistoricalTournament, setSelectedHistoricalTournament] = useState(null);
+
+  //Settings States
+  const [showSettings, setShowSettings] = useState(false);
+  const [userRole, setUserRole] = useState('admin');
 
   // Session completion milestones
   const sessionMilestones = {
@@ -7061,9 +7066,87 @@ completedAt: null,
     );
   };
 
+  // Settings Modal Component
+const SettingsModal = () => {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg shadow-xl p-6 max-w-2xl w-full">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold">System Settings</h2>
+          <button onClick={() => setShowSettings(false)} className="text-2xl">
+            ×
+          </button>
+        </div>
+        
+        <div className="space-y-6">
+          {/* User Role Setting */}
+          <div>
+            <h3 className="font-semibold mb-2">User Role</h3>
+            <select 
+              value={userRole} 
+              onChange={(e) => setUserRole(e.target.value)}
+              className="px-3 py-2 border rounded"
+            >
+              <option value="teacher">Teacher</option>
+              <option value="admin">Administrator</option>
+            </select>
+            <p className="text-sm text-gray-600 mt-1">
+              Admin role shows additional management options
+            </p>
+          </div>
+          
+          {/* Data Management */}
+          <div>
+            <h3 className="font-semibold mb-2">Data Management</h3>
+            <button 
+              onClick={exportData}
+              className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 mr-2"
+            >
+              Export All Data
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
   // Main Render
   return (
     <div className="min-h-screen bg-gray-100">
+<NavigationBar
+  // View state
+  currentView={currentView}
+  setCurrentView={setCurrentView}
+  currentSession={currentSession}
+  activeTournament={activeTournament}
+  tournaments={tournaments}
+  userRole={userRole} // or "admin" - we'll make this dynamic later
+  
+  // Session Tasks
+  setShowBulkAward={setShowBulkAward}
+  setShowAttendanceManager={setShowAttendanceManager}
+  setShowTeamManager={setShowTeamManager}
+  setShowMatchEntry={setShowMatchEntry}
+  setShowSkillsEntry={setShowSkillsEntry}
+  setSkillsType={setSkillsType}
+  
+  // Tournaments
+  setShowTournamentWizard={setShowTournamentWizard}
+  setShowTournamentDashboard={setShowTournamentDashboard}
+  setActiveTournament={setActiveTournament}
+  
+  // Reports
+  setShowTournamentHistory={setShowTournamentHistory}
+  setShowAttendanceReport={setShowAttendanceReport}
+  exportData={exportData}
+  
+  // Admin
+  setShowSessionManager={setShowSessionManager}
+  setShowStudentManager={setShowStudentManager}
+  setShowAchievementManager={setShowAchievementManager}
+  setShowSettings={setShowSettings} // This will error until we add the state
+/>
       <div className="bg-blue-600 text-white p-4 shadow-lg">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
@@ -7438,6 +7521,7 @@ completedAt: null,
     onClose={() => setSelectedHistoricalTournament(null)}
   />
 )}
+{showSettings && <SettingsModal />}
     </div>
   );
 };
