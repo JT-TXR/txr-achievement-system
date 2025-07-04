@@ -249,7 +249,9 @@ const VEXLifetimeAchievementSystem = () => {
   const [activeTournament, setActiveTournament] = useState(null);
   const [showTournamentWizard, setShowTournamentWizard] = useState(false);
   const [showTournamentDashboard, setShowTournamentDashboard] = useState(false);
+  const [showTournamentHistory, setShowTournamentHistory] = useState(false);
   const [showAwardsCeremony, setShowAwardsCeremony] = useState(false);
+  const [selectedHistoricalTournament, setSelectedHistoricalTournament] = useState(null);
 
   // Session completion milestones
   const sessionMilestones = {
@@ -281,6 +283,13 @@ const VEXLifetimeAchievementSystem = () => {
 
   // Track session milestones per student
   const [studentMilestones, setStudentMilestones] = useState({});
+
+  const recentTournaments = useMemo(() => {
+    return tournaments
+      .filter(t => t.status === "complete" && t.sessionId === currentSession)
+      .sort((a, b) => new Date(b.completedAt || b.createdAt) - new Date(a.completedAt || a.createdAt))
+      .slice(0, 3);
+  }, [tournaments, currentSession]);
 
   // Load data on mount
   useEffect(() => {
@@ -608,6 +617,7 @@ const VEXLifetimeAchievementSystem = () => {
       tournaments,
       attendance,
       exportDate: new Date().toISOString(),
+      version: "2.0" 
     };
     const dataStr = JSON.stringify(exportObj, null, 2);
     const dataUri =
@@ -636,6 +646,43 @@ const VEXLifetimeAchievementSystem = () => {
       joinDate: new Date().toISOString(),
       sessionsAttended: [currentSession],
       enrolledSessions: [currentSession], // Add this line - auto-enroll in current session
+
+      tournamentHistory: [],
+personalBests: {
+  teamwork: {
+    highScore: 0,
+    averageScore: 0,
+    tournamentId: null,
+    tournamentName: null,
+    date: null,
+    partner: null
+  },
+  driverSkills: {
+    highScore: 0,
+    tournamentId: null,
+    tournamentName: null,
+    date: null
+  },
+  autonomousSkills: {
+    highScore: 0,
+    tournamentId: null,
+    tournamentName: null,
+    date: null
+  },
+  combinedSkills: {
+    highScore: 0,
+    tournamentId: null,
+    tournamentName: null,
+    date: null
+  }
+},
+tournamentStats: {
+  totalTournaments: 0,
+  championships: 0,
+  podiumFinishes: 0,
+  averagePlacement: 0,
+  favoritePartners: []
+}
     };
     setStudents([...students, newStudent]);
   };
@@ -687,6 +734,10 @@ const VEXLifetimeAchievementSystem = () => {
       tournamentId: activeTournament?.id || null,
     };
     setSkillsScores([...skillsScores, enhancedScore]);
+  };
+
+  const handleViewHistoricalTournament = (tournament) => {
+    setSelectedHistoricalTournament(tournament);
   };
 
   // Student Manager Modal
@@ -1998,6 +2049,17 @@ const VEXLifetimeAchievementSystem = () => {
       (t) => t.sessionId === currentSession && t.status !== "complete"
     );
 
+    const completedCount = tournaments.filter(t => t.status === "complete").length;
+
+    const currentSessionCount = tournaments.filter(
+      t => t.status === 'complete' && t.sessionId === currentSession
+    ).length;
+    
+
+    const completedTournamentsCount = tournaments.filter(
+      t => t.status === "complete"
+    ).length;
+
     return (
       <div className="flex gap-2 flex-wrap">
         {activeTournamentExists ? (
@@ -2062,11 +2124,33 @@ const VEXLifetimeAchievementSystem = () => {
           🤖 Auton Skills
         </button>
         <button
-          onClick={() => setShowTournamentView(true)}
-          className="px-3 py-1 bg-orange-600 rounded hover:bg-orange-700 text-white"
-        >
-          📊 Tournament
-        </button>
+  onClick={() => {
+    const activeTournament = tournaments.find(
+      t => t.sessionId === currentSession && t.status !== "complete"
+    );
+    
+    if (activeTournament) {
+      setActiveTournament(activeTournament);
+      setShowTournamentDashboard(true);
+    } else {
+      setShowTournamentHistory(true);
+    }
+  }}
+  className="bg-yellow-500 hover:bg-yellow-600 text-white px-6 py-3 rounded-lg font-medium flex items-center gap-2 relative"
+>
+  <span className="text-xl">🏆</span>
+  <span>
+    {tournaments.find(t => t.sessionId === currentSession && t.status !== "complete") 
+      ? "Current Tournament" 
+      : "Tournament History"}
+  </span>
+  {/* Add the badge */}
+  {currentSessionCount > 0 && !tournaments.find(t => t.sessionId === currentSession && t.status !== "complete") && (
+    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold">
+      {currentSessionCount}
+    </span>
+  )}
+</button>
         <button
           onClick={() => setShowAttendanceManager(true)}
           className="px-3 py-1 bg-purple-500 text-white rounded hover:bg-purple-600"
@@ -3956,9 +4040,11 @@ const VEXLifetimeAchievementSystem = () => {
       const newTournament = {
         id: `tournament_${Date.now()}`,
         sessionId: currentSession,
+        sessionName: sessions.find(s => s.id === currentSession)?.name || currentSession,
         name: tournamentConfig.name,
         format: tournamentConfig.format,
         status: "setup",
+        date: new Date().toISOString(),
         config: {
           matchesPerTeam: tournamentConfig.matchesPerTeam,
           skillsTrials: tournamentConfig.skillsTrials,
@@ -3974,8 +4060,10 @@ const VEXLifetimeAchievementSystem = () => {
           qualRankings: [],
           finalRankings: [],
           awards: [],
+          studentResults: {}
         },
         createdAt: new Date().toISOString(),
+completedAt: null,
       };
 
       // Generate qualification matches based on format
@@ -4737,6 +4825,7 @@ const VEXLifetimeAchievementSystem = () => {
       const updatedTournament = {
         ...currentTournament,
         status: "complete",
+        completedAt: new Date().toISOString(),
         results: {
           ...currentTournament.results,
           qualRankings: rankings,
@@ -4750,6 +4839,8 @@ const VEXLifetimeAchievementSystem = () => {
         )
       );
       setActiveTournament(updatedTournament);
+
+      updateStudentTournamentHistory(updatedTournament);
 
       // Show awards ceremony
       setShowTournamentDashboard(false);
@@ -4907,12 +4998,26 @@ const VEXLifetimeAchievementSystem = () => {
                   </span>
                 </div>
               </div>
-              <button
-                onClick={() => setShowTournamentDashboard(false)}
-                className="text-2xl hover:text-gray-600"
-              >
-                ×
-              </button>
+              <div className="flex items-center gap-2">
+      {/* NEW: View All Tournaments button */}
+      <button
+        onClick={() => {
+          setShowTournamentDashboard(false);
+          setShowTournamentHistory(true);
+        }}
+        className="px-3 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm"
+      >
+        📋 View All
+      </button>
+      
+      {/* KEEP the existing close button */}
+      <button
+        onClick={() => setShowTournamentDashboard(false)}
+        className="text-2xl hover:text-gray-600"
+      >
+        ×
+      </button>
+    </div>
             </div>
 
             {/* Progress Bars */}
@@ -5139,6 +5244,369 @@ const VEXLifetimeAchievementSystem = () => {
               </div>
             )}
           </div>
+        </div>
+      </div>
+    );
+  };
+
+  const TournamentHistory = ({ tournaments, sessions, teams, students, onClose, onViewTournament }) => {
+    const [filterSession, setFilterSession] = useState("ALL");
+    const [filterFormat, setFilterFormat] = useState("ALL");
+    const [filterDateRange, setFilterDateRange] = useState("ALL");
+    const [searchQuery, setSearchQuery] = useState("");
+    const [sortBy, setSortBy] = useState("date-desc");
+    const [viewMode, setViewMode] = useState("grid"); // grid or list
+  
+    // Get all completed tournaments
+    const completedTournaments = tournaments.filter(t => t.status === "complete");
+
+    // Apply filters
+    const filteredTournaments = completedTournaments.filter(tournament => {
+      // Session filter
+      if (filterSession !== "ALL" && tournament.sessionId !== filterSession) {
+        return false;
+      }
+  
+      // Format filter
+      if (filterFormat !== "ALL" && tournament.format !== filterFormat) {
+        return false;
+      }
+  
+      // Date range filter
+      if (filterDateRange !== "ALL") {
+        const tournamentDate = new Date(tournament.completedAt || tournament.createdAt);
+        const now = new Date();
+        const daysDiff = Math.floor((now - tournamentDate) / (1000 * 60 * 60 * 24));
+  
+        switch (filterDateRange) {
+          case "week":
+            if (daysDiff > 7) return false;
+            break;
+          case "month":
+            if (daysDiff > 30) return false;
+            break;
+          case "season":
+            if (daysDiff > 90) return false;
+            break;
+        }
+      }
+  
+      // Search filter
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        return tournament.name.toLowerCase().includes(query) ||
+               tournament.sessionName?.toLowerCase().includes(query);
+      }
+  
+      return true;
+    });
+  
+    // Sort tournaments
+    const sortedTournaments = [...filteredTournaments].sort((a, b) => {
+      switch (sortBy) {
+        case "date-desc":
+          return new Date(b.completedAt || b.createdAt) - new Date(a.completedAt || a.createdAt);
+        case "date-asc":
+          return new Date(a.completedAt || a.createdAt) - new Date(b.completedAt || b.createdAt);
+        case "name":
+          return a.name.localeCompare(b.name);
+        case "participants":
+          return b.teams.length - a.teams.length;
+        default:
+          return 0;
+      }
+    });
+  
+    // Get tournament champion(s)
+    const getChampions = (tournament) => {
+      const champions = tournament.results.finalRankings
+        .filter(r => r.rank === 1)
+        .map(r => {
+          const team = teams.find(t => t.id === r.teamId);
+          return team ? team.name : "Unknown Team";
+        });
+      return champions;
+    };
+  
+    // Format date
+    const formatDate = (dateString) => {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric', 
+        year: 'numeric' 
+      });
+    };
+  
+    // Tournament Card Component
+    const TournamentCard = ({ tournament }) => {
+      const champions = getChampions(tournament);
+      const participantCount = tournament.teams.length;
+      const matchCount = (tournament.matches.quals?.length || 0) + (tournament.matches.finals?.length || 0);
+      const isArchived = !sessions.find(s => s.id === tournament.sessionId)?.isActive;
+  
+      return (
+        <div 
+          className={`bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow cursor-pointer ${
+            isArchived ? 'opacity-75' : ''
+          }`}
+          onClick={() => onViewTournament(tournament)}
+        >
+          {/* Header */}
+          <div className={`p-4 rounded-t-lg ${
+            tournament.format === 'teamwork' ? 'bg-blue-500' :
+            tournament.format === 'driver' ? 'bg-green-500' :
+            'bg-purple-500'
+          } text-white`}>
+            <div className="flex justify-between items-start">
+              <div>
+                <h3 className="text-lg font-bold">{tournament.name}</h3>
+                <p className="text-sm opacity-90">
+                  {tournament.sessionName || tournament.sessionId}
+                  {isArchived && " (Archived)"}
+                </p>
+              </div>
+              <div className="text-2xl">
+                {tournament.format === 'teamwork' ? '🤝' :
+                 tournament.format === 'driver' ? '🎮' : '🤖'}
+              </div>
+            </div>
+          </div>
+  
+          {/* Body */}
+          <div className="p-4 space-y-3">
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Date:</span>
+              <span className="font-medium">{formatDate(tournament.completedAt || tournament.createdAt)}</span>
+            </div>
+  
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Teams:</span>
+              <span className="font-medium">{participantCount}</span>
+            </div>
+  
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Matches:</span>
+              <span className="font-medium">{matchCount}</span>
+            </div>
+  
+            <div className="border-t pt-3">
+              <div className="text-sm text-gray-600 mb-1">🏆 Champions:</div>
+              <div className="font-semibold text-gray-800">
+                {champions.join(" & ")}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+  
+    // Tournament List Row Component
+    const TournamentRow = ({ tournament }) => {
+      const champions = getChampions(tournament);
+      const participantCount = tournament.teams.length;
+      const isArchived = !sessions.find(s => s.id === tournament.sessionId)?.isActive;
+  
+      return (
+        <tr 
+          className={`hover:bg-gray-50 cursor-pointer ${isArchived ? 'opacity-75' : ''}`}
+          onClick={() => onViewTournament(tournament)}
+        >
+          <td className="px-4 py-3">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">
+                {tournament.format === 'teamwork' ? '🤝' :
+                 tournament.format === 'driver' ? '🎮' : '🤖'}
+              </span>
+              <div>
+                <div className="font-medium">{tournament.name}</div>
+                <div className="text-sm text-gray-600">
+                  {tournament.sessionName || tournament.sessionId}
+                  {isArchived && " (Archived)"}
+                </div>
+              </div>
+            </div>
+          </td>
+          <td className="px-4 py-3 text-sm">
+            {formatDate(tournament.completedAt || tournament.createdAt)}
+          </td>
+          <td className="px-4 py-3 text-sm capitalize">
+            {tournament.format}
+          </td>
+          <td className="px-4 py-3 text-sm text-center">
+            {participantCount}
+          </td>
+          <td className="px-4 py-3">
+            <div className="font-medium text-sm">{champions.join(" & ")}</div>
+          </td>
+        </tr>
+      );
+    };
+  
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="bg-white rounded-lg shadow-xl max-w-7xl w-full max-h-[90vh] flex flex-col">
+          {/* Header */}
+          <div className="p-6 border-b">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold">🏆 Tournament History</h2>
+              <button onClick={onClose} className="text-2xl hover:text-gray-600">
+                ×
+              </button>
+            </div>
+  
+            {/* Filters */}
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+              {/* Search */}
+              <div className="md:col-span-2">
+                <input
+                  type="text"
+                  placeholder="Search tournaments..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg"
+                />
+              </div>
+  
+              {/* Session Filter */}
+              <select
+                value={filterSession}
+                onChange={(e) => setFilterSession(e.target.value)}
+                className="px-3 py-2 border rounded-lg"
+              >
+                <option value="ALL">All Sessions</option>
+                {sessions.map(session => (
+                  <option key={session.id} value={session.id}>
+                    {session.name} {!session.isActive && "(Archived)"}
+                  </option>
+                ))}
+              </select>
+  
+              {/* Format Filter */}
+              <select
+                value={filterFormat}
+                onChange={(e) => setFilterFormat(e.target.value)}
+                className="px-3 py-2 border rounded-lg"
+              >
+                <option value="ALL">All Formats</option>
+                <option value="teamwork">Teamwork</option>
+                <option value="driver">Driver Skills</option>
+                <option value="autonomous">Autonomous</option>
+              </select>
+  
+              {/* Date Range Filter */}
+              <select
+                value={filterDateRange}
+                onChange={(e) => setFilterDateRange(e.target.value)}
+                className="px-3 py-2 border rounded-lg"
+              >
+                <option value="ALL">All Time</option>
+                <option value="week">Last Week</option>
+                <option value="month">Last Month</option>
+                <option value="season">This Season</option>
+              </select>
+            </div>
+  
+            {/* View Controls */}
+            <div className="flex justify-between items-center mt-4">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600">Sort by:</span>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="px-2 py-1 border rounded text-sm"
+                >
+                  <option value="date-desc">Newest First</option>
+                  <option value="date-asc">Oldest First</option>
+                  <option value="name">Name</option>
+                  <option value="participants">Most Teams</option>
+                </select>
+              </div>
+  
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`px-3 py-1 rounded ${
+                    viewMode === 'grid' ? 'bg-blue-500 text-white' : 'bg-gray-200'
+                  }`}
+                >
+                  Grid
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`px-3 py-1 rounded ${
+                    viewMode === 'list' ? 'bg-blue-500 text-white' : 'bg-gray-200'
+                  }`}
+                >
+                  List
+                </button>
+              </div>
+            </div>
+          </div>
+  
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto p-6">
+            {sortedTournaments.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="text-6xl mb-4">🏆</div>
+                <h3 className="text-xl font-semibold mb-2">No Tournaments Found</h3>
+                <p className="text-gray-600">
+                  {completedTournaments.length === 0 
+                    ? "No tournaments have been completed yet."
+                    : "Try adjusting your filters to see tournaments."}
+                </p>
+              </div>
+            ) : viewMode === 'grid' ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {sortedTournaments.map(tournament => (
+                  <TournamentCard key={tournament.id} tournament={tournament} />
+                ))}
+              </div>
+            ) : (
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left px-4 py-2">Tournament</th>
+                    <th className="text-left px-4 py-2">Date</th>
+                    <th className="text-left px-4 py-2">Format</th>
+                    <th className="text-center px-4 py-2">Teams</th>
+                    <th className="text-left px-4 py-2">Champions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedTournaments.map(tournament => (
+                    <TournamentRow key={tournament.id} tournament={tournament} />
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+  
+          {/* Summary Stats */}
+          {completedTournaments.length > 0 && (
+            <div className="p-4 bg-gray-50 border-t">
+              <div className="flex justify-around text-center">
+                <div>
+                  <div className="text-2xl font-bold text-blue-600">
+                    {completedTournaments.length}
+                  </div>
+                  <div className="text-sm text-gray-600">Total Tournaments</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-green-600">
+                    {sessions.filter(s => s.isActive).length}
+                  </div>
+                  <div className="text-sm text-gray-600">Active Sessions</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-purple-600">
+                    {sessions.filter(s => !s.isActive).length}
+                  </div>
+                  <div className="text-sm text-gray-600">Archived Sessions</div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -5565,6 +6033,347 @@ const VEXLifetimeAchievementSystem = () => {
     );
   };
 
+  const updateStudentTournamentHistory = (tournament) => {
+    const updatedStudents = [...students];
+    const tournamentTeams = teams.filter(t => tournament.teams.includes(t.id));
+    
+    // Process each student's results
+    tournament.results.finalRankings.forEach(ranking => {
+      const team = tournamentTeams.find(t => t.id === ranking.teamId);
+      if (!team) return;
+      
+      team.studentIds.forEach(studentId => {
+        const studentIndex = updatedStudents.findIndex(s => s.id === studentId);
+        if (studentIndex === -1) return;
+        
+        const student = updatedStudents[studentIndex];
+        
+        // Create tournament history entry
+        const historyEntry = {
+          tournamentId: tournament.id,
+          tournamentName: tournament.name,
+          sessionId: tournament.sessionId,
+          sessionName: tournament.sessionName,
+          date: tournament.completedAt || tournament.createdAt,
+          format: tournament.format,
+          placement: ranking.rank,
+          teamId: team.id,
+          teamName: team.name,
+          teamNumber: team.number,
+          partnerIds: team.studentIds.filter(id => id !== studentId),
+          partnerNames: team.studentNames.filter((name, idx) => 
+            team.studentIds[idx] !== studentId
+          ),
+          score: ranking.score,
+          alliancePartner: ranking.alliancePartner || null,
+          qualRanking: tournament.results.qualRankings.find(r => 
+            r.teamId === team.id
+          )?.rank || null
+        };
+        
+        // Initialize tournament history if needed
+        if (!student.tournamentHistory) {
+          student.tournamentHistory = [];
+        }
+        
+        // Add to tournament history
+        student.tournamentHistory.push(historyEntry);
+        
+        // Update personal bests
+        if (!student.personalBests) {
+          student.personalBests = {
+            teamwork: { highScore: 0 },
+            driverSkills: { highScore: 0 },
+            autonomousSkills: { highScore: 0 },
+            combinedSkills: { highScore: 0 }
+          };
+        }
+        
+        if (tournament.format === 'teamwork') {
+          if (ranking.score > (student.personalBests.teamwork.highScore || 0)) {
+            student.personalBests.teamwork = {
+              highScore: ranking.score,
+              averageScore: ranking.score, // Update with actual average if available
+              tournamentId: tournament.id,
+              tournamentName: tournament.name,
+              date: historyEntry.date,
+              partner: historyEntry.partnerNames.join(', ')
+            };
+          }
+        }
+        
+        // Update tournament statistics
+        if (!student.tournamentStats) {
+          student.tournamentStats = {
+            totalTournaments: 0,
+            championships: 0,
+            podiumFinishes: 0,
+            averagePlacement: 0,
+            favoritePartners: []
+          };
+        }
+        
+        student.tournamentStats.totalTournaments++;
+        if (ranking.rank === 1) student.tournamentStats.championships++;
+        if (ranking.rank <= 3) student.tournamentStats.podiumFinishes++;
+        
+        // Recalculate average placement
+        const allPlacements = student.tournamentHistory.map(h => h.placement);
+        student.tournamentStats.averagePlacement = 
+          allPlacements.reduce((a, b) => a + b, 0) / allPlacements.length;
+        
+        // Update favorite partners
+        historyEntry.partnerIds.forEach(partnerId => {
+          const existingPartner = student.tournamentStats.favoritePartners.find(
+            p => p.id === partnerId
+          );
+          if (existingPartner) {
+            existingPartner.count++;
+          } else {
+            const partnerStudent = students.find(s => s.id === partnerId);
+            if (partnerStudent) {
+              student.tournamentStats.favoritePartners.push({
+                id: partnerId,
+                name: partnerStudent.name,
+                count: 1
+              });
+            }
+          }
+        });
+        
+        // Sort favorite partners by count
+        student.tournamentStats.favoritePartners.sort((a, b) => b.count - a.count);
+        
+        updatedStudents[studentIndex] = student;
+      });
+    });
+    
+    setStudents(updatedStudents);
+  };
+
+  const TournamentDetailsModal = ({ tournament, onClose }) => {
+    if (!tournament) return null;
+  
+    // Get tournament data
+    const tournamentTeams = teams.filter(t => tournament.teams.includes(t.id));
+    const totalMatches = (tournament.matches.quals?.length || 0) + 
+                        (tournament.matches.finals?.length || 0);
+    
+    // Get champions with full details
+    const champions = tournament.results.finalRankings
+      .filter(r => r.rank === 1)
+      .map(r => {
+        const team = teams.find(t => t.id === r.teamId);
+        return team ? {
+          teamName: team.name,
+          teamNumber: team.number,
+          studentNames: team.studentNames,
+          score: r.score
+        } : null;
+      })
+      .filter(Boolean);
+    
+    // Get all final rankings
+    const finalRankings = tournament.results.finalRankings
+      .sort((a, b) => a.rank - b.rank)
+      .map(ranking => {
+        const team = teams.find(t => t.id === ranking.teamId);
+        return { ...ranking, team };
+      });
+  
+    // Format date
+    const formatDate = (dateString) => {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    };
+  
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="bg-white rounded-lg shadow-xl p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+          {/* Header */}
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h2 className="text-2xl font-bold flex items-center gap-2">
+                <span className="text-3xl">
+                  {tournament.format === 'teamwork' ? '🤝' :
+                   tournament.format === 'driver' ? '🎮' : '🤖'}
+                </span>
+                {tournament.name}
+              </h2>
+              <p className="text-gray-600 mt-1">
+                {formatDate(tournament.completedAt || tournament.createdAt)}
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-2xl hover:text-gray-600"
+            >
+              ×
+            </button>
+          </div>
+  
+          {/* Tournament Info */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="bg-gray-50 p-3 rounded-lg text-center">
+              <div className="text-2xl font-bold text-blue-600">
+                {tournament.format === 'teamwork' ? 'Teamwork' :
+                 tournament.format === 'driver' ? 'Driver Skills' : 'Autonomous'}
+              </div>
+              <div className="text-sm text-gray-600">Format</div>
+            </div>
+            <div className="bg-gray-50 p-3 rounded-lg text-center">
+              <div className="text-2xl font-bold text-green-600">
+                {tournamentTeams.length}
+              </div>
+              <div className="text-sm text-gray-600">Teams</div>
+            </div>
+            <div className="bg-gray-50 p-3 rounded-lg text-center">
+              <div className="text-2xl font-bold text-purple-600">
+                {totalMatches}
+              </div>
+              <div className="text-sm text-gray-600">Matches</div>
+            </div>
+            <div className="bg-gray-50 p-3 rounded-lg text-center">
+              <div className="text-2xl font-bold text-orange-600">
+                {tournament.sessionName || tournament.sessionId}
+              </div>
+              <div className="text-sm text-gray-600">Session</div>
+            </div>
+          </div>
+  
+          {/* Champions Section */}
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+              <span>🏆</span>
+              Champions
+            </h3>
+            <div className="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-4">
+              {champions.map((champion, index) => (
+                <div key={index} className="mb-2 last:mb-0">
+                  <div className="font-semibold text-lg flex items-center gap-2">
+                    <span className="text-2xl">🥇</span>
+                    {champion.teamNumber}: {champion.teamName}
+                  </div>
+                  <div className="text-sm text-gray-600 ml-9">
+                    {champion.studentNames.join(" & ")} • Score: {champion.score}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+  
+          {/* Final Rankings */}
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold mb-3">📊 Final Rankings</h3>
+            <div className="space-y-2">
+              {finalRankings.slice(0, 6).map((ranking) => {
+                const medal = ranking.rank === 1 ? '🥇' : 
+                             ranking.rank === 2 ? '🥈' : 
+                             ranking.rank === 3 ? '🥉' : '';
+                
+                return (
+                  <div
+                    key={ranking.teamId}
+                    className={`flex items-center justify-between p-3 rounded-lg ${
+                      ranking.rank <= 3 ? 'bg-gray-100' : 'bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="text-lg font-bold text-gray-500 w-8">
+                        {medal || `#${ranking.rank}`}
+                      </div>
+                      <div>
+                        <div className="font-semibold">
+                          {ranking.team?.number}: {ranking.team?.name || 'Unknown Team'}
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          {ranking.team?.studentNames.join(", ")}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-lg font-bold">
+                      {ranking.score} pts
+                    </div>
+                  </div>
+                );
+              })}
+              {finalRankings.length > 6 && (
+                <div className="text-center text-sm text-gray-500 pt-2">
+                  ... and {finalRankings.length - 6} more teams
+                </div>
+              )}
+            </div>
+          </div>
+
+{/* Qualification Rankings */}
+{tournament.results.qualRankings && tournament.results.qualRankings.length > 0 && (
+  <div className="mb-6">
+    <h3 className="text-lg font-semibold mb-3">📈 Qualification Rankings</h3>
+    <div className="bg-blue-50 rounded-lg p-4">
+      <div className="space-y-2 max-h-60 overflow-y-auto">
+        {tournament.results.qualRankings.map((ranking, index) => {
+          const team = teams.find(t => t.id === ranking.teamId);
+          return (
+            <div 
+              key={ranking.teamId} 
+              className="flex items-center justify-between p-2 rounded"
+            >
+              <div className="flex items-center gap-3">
+                <span className={`text-sm font-medium ${
+                  index < 2 ? 'text-blue-600 font-bold' : 'text-gray-600'
+                }`}>
+                  #{index + 1}
+                </span>
+                <span className="font-medium">
+                  {team?.number}: {team?.name || 'Unknown'}
+                </span>
+              </div>
+              <div className="text-sm">
+                <span className="font-semibold">{ranking.average || ranking.score}</span>
+                <span className="text-gray-600 ml-1">
+                  ({ranking.matches || 0} matches)
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {tournament.results.qualRankings.length > 8 && (
+        <div className="text-xs text-gray-500 text-center mt-2">
+          Scroll to see all {tournament.results.qualRankings.length} teams
+        </div>
+      )}
+    </div>
+  </div>
+)}
+  
+          {/* Action Buttons */}
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => {
+                onClose();
+                setShowTournamentHistory(true);
+              }}
+              className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+            >
+              View All Tournaments
+            </button>
+            <button
+              onClick={onClose}
+              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Student Card Component
   const StudentCard = ({ student }) => {
     const lifetimeLevel = getStudentLevel(student.lifetimeXP || 0);
@@ -5600,18 +6409,28 @@ const VEXLifetimeAchievementSystem = () => {
         return status === "present" || status === "late";
       }).length;
 
-      // Debug log
-      console.log(
-        `Student ${student.name}: ${attended}/${
-          pastDates.length
-        } = ${Math.round((attended / pastDates.length) * 100)}%`
-      );
-      console.log("Past dates:", pastDates);
-      console.log("Today:", todayStr);
+      // // Debug log
+      // console.log(
+      //   `Student ${student.name}: ${attended}/${
+      //     pastDates.length
+      //   } = ${Math.round((attended / pastDates.length) * 100)}%`
+      // );
+      // console.log("Past dates:", pastDates);
+      // console.log("Today:", todayStr);
 
       return Math.round((attended / pastDates.length) * 100);
     };
     const attendanceRate = getAttendanceRate();
+
+      // Add tournament stats
+  const tournamentStats = student.tournamentStats || {
+    totalTournaments: 0,
+    championships: 0,
+    podiumFinishes: 0
+  };
+  
+  const hasChampionships = tournamentStats.championships > 0;
+  const hasPodiumFinishes = tournamentStats.podiumFinishes > 0;
 
     const getProgramColor = (program) => {
       switch (program) {
@@ -5639,7 +6458,15 @@ const VEXLifetimeAchievementSystem = () => {
           <div className="flex items-center gap-3">
             <div className="text-5xl">{student.avatar}</div>
             <div>
-              <h3 className="font-bold text-lg">{student.name}</h3>
+            <h3 className="font-bold text-lg flex items-center gap-2">
+              {student.name}
+              {/* Add championship indicator */}
+              {hasChampionships && (
+                <span className="text-sm" title={`${tournamentStats.championships} Championship${tournamentStats.championships > 1 ? 's' : ''}`}>
+                  🏆
+                </span>
+              )}
+            </h3>
               {attendanceRate !== null && (
                 <div className="text-sm text-gray-600 flex items-center gap-1">
                   <span>📅</span>
@@ -5687,6 +6514,16 @@ const VEXLifetimeAchievementSystem = () => {
           </div>
         </div>
 
+      {/* Add tournament summary line */}
+      {tournamentStats.totalTournaments > 0 && (
+        <div className="mb-2 text-sm text-gray-600 flex items-center gap-3">
+          <span>🎯 {tournamentStats.totalTournaments} tournaments</span>
+          {hasPodiumFinishes && (
+            <span>🏅 {tournamentStats.podiumFinishes} podiums</span>
+          )}
+        </div>
+      )}
+      
         <div className="flex gap-2 flex-wrap">
           {currentSessionAchievements.slice(0, 5).map((achievementId) => {
             const achievement = achievements.find(
@@ -5711,7 +6548,7 @@ const VEXLifetimeAchievementSystem = () => {
         </div>
       </div>
     );
-  };
+  };  
 
   const StudentDetail = () => {
     if (!selectedStudent) return null;
@@ -5722,6 +6559,7 @@ const VEXLifetimeAchievementSystem = () => {
 
     const [showXPAnimation, setShowXPAnimation] = useState(null);
     const [showManualXP, setShowManualXP] = useState(false);
+    const [showAllTournaments, setShowAllTournaments] = useState(false);
 
     const lifetimeLevel = getStudentLevel(currentStudent.lifetimeXP || 0);
     const sessionXP = getSessionXP(currentStudent);
@@ -5732,6 +6570,31 @@ const VEXLifetimeAchievementSystem = () => {
         a.type === "lifetime" &&
         (currentStudent.achievements || []).includes(a.id)
     );
+
+      // Get student's tournament history
+  const studentTournamentHistory = currentStudent.tournamentHistory || [];
+  const recentTournaments = showAllTournaments 
+    ? studentTournamentHistory 
+    : studentTournamentHistory.slice(-3).reverse();
+
+      // Calculate tournament stats
+  const tournamentStats = currentStudent.tournamentStats || {
+    totalTournaments: 0,
+    championships: 0,
+    podiumFinishes: 0,
+    averagePlacement: 0,
+    favoritePartners: []
+  };
+
+  // Format placement with medal
+  const getPlacementDisplay = (placement) => {
+    switch(placement) {
+      case 1: return '🥇 1st';
+      case 2: return '🥈 2nd';
+      case 3: return '🥉 3rd';
+      default: return `${placement}th`;
+    }
+  };
 
     // Award XP with animation feedback
     const awardXPWithFeedback = (amount, isLifetime = false) => {
@@ -5859,6 +6722,151 @@ const VEXLifetimeAchievementSystem = () => {
               </div>
             )}
           </div>
+
+                  {/* Tournament History Section */}
+        {studentTournamentHistory.length > 0 && (
+          <div className="mb-6">
+            <h3 className="font-bold text-lg mb-3 flex items-center justify-between">
+              <span>🏆 Tournament History</span>
+              {studentTournamentHistory.length > 3 && (
+                <button
+                  onClick={() => setShowAllTournaments(!showAllTournaments)}
+                  className="text-sm text-blue-600 hover:text-blue-800 font-normal"
+                >
+                  {showAllTournaments ? 'Show Less' : `View All ${studentTournamentHistory.length}`}
+                </button>
+              )}
+            </h3>
+            
+            {/* Tournament Stats Summary */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+              <div className="bg-gray-50 p-3 rounded-lg text-center">
+                <div className="text-2xl font-bold text-blue-600">
+                  {tournamentStats.totalTournaments}
+                </div>
+                <div className="text-xs text-gray-600">Tournaments</div>
+              </div>
+              <div className="bg-gray-50 p-3 rounded-lg text-center">
+                <div className="text-2xl font-bold text-yellow-600">
+                  {tournamentStats.championships}
+                </div>
+                <div className="text-xs text-gray-600">Championships</div>
+              </div>
+              <div className="bg-gray-50 p-3 rounded-lg text-center">
+                <div className="text-2xl font-bold text-green-600">
+                  {tournamentStats.podiumFinishes}
+                </div>
+                <div className="text-xs text-gray-600">Podium Finishes</div>
+              </div>
+              <div className="bg-gray-50 p-3 rounded-lg text-center">
+                <div className="text-2xl font-bold text-purple-600">
+                  {tournamentStats.averagePlacement ? 
+                    tournamentStats.averagePlacement.toFixed(1) : '-'}
+                </div>
+                <div className="text-xs text-gray-600">Avg. Place</div>
+              </div>
+            </div>
+
+            {/* Tournament List */}
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {recentTournaments.map((tournament, index) => (
+                <div 
+                  key={tournament.tournamentId}
+                  className={`p-3 rounded-lg border ${
+                    tournament.placement === 1 ? 'border-yellow-300 bg-yellow-50' :
+                    tournament.placement <= 3 ? 'border-gray-300 bg-gray-50' :
+                    'border-gray-200'
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-lg">
+                          {tournament.format === 'teamwork' ? '🤝' :
+                           tournament.format === 'driver' ? '🎮' : '🤖'}
+                        </span>
+                        <span className="font-semibold">
+                          {tournament.tournamentName}
+                        </span>
+                        <span className="text-sm text-gray-500">
+                          {new Date(tournament.date).toLocaleDateString()}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center gap-4 text-sm">
+                        <span className="font-semibold">
+                          {getPlacementDisplay(tournament.placement)}
+                        </span>
+                        <span className="text-gray-600">
+                          Team: {tournament.teamNumber}
+                        </span>
+                        {tournament.partnerNames.length > 0 && (
+                          <span className="text-gray-600">
+                            w/ {tournament.partnerNames.join(' & ')}
+                          </span>
+                        )}
+                        <span className="font-medium">
+                          Score: {tournament.score}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Favorite Partners */}
+            {tournamentStats.favoritePartners && tournamentStats.favoritePartners.length > 0 && (
+              <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+                <div className="text-sm font-semibold mb-1">🤝 Favorite Partners:</div>
+                <div className="text-sm text-gray-700">
+                  {tournamentStats.favoritePartners.slice(0, 3).map((partner, idx) => (
+                    <span key={partner.id}>
+                      {partner.name} ({partner.count}x)
+                      {idx < Math.min(2, tournamentStats.favoritePartners.length - 1) && ', '}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Personal Bests */}
+            {currentStudent.personalBests && (
+              <div className="mt-3 p-3 bg-green-50 rounded-lg">
+                <div className="text-sm font-semibold mb-1">🌟 Personal Bests:</div>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  {currentStudent.personalBests.teamwork.highScore > 0 && (
+                    <div>
+                      <span className="text-gray-600">Teamwork:</span>
+                      <span className="font-medium ml-1">
+                        {currentStudent.personalBests.teamwork.highScore} pts
+                      </span>
+                    </div>
+                  )}
+                  {currentStudent.personalBests.driverSkills.highScore > 0 && (
+                    <div>
+                      <span className="text-gray-600">Driver:</span>
+                      <span className="font-medium ml-1">
+                        {currentStudent.personalBests.driverSkills.highScore} pts
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* No Tournament History Message */}
+        {studentTournamentHistory.length === 0 && (
+          <div className="mb-6 p-4 bg-gray-50 rounded-lg text-center">
+            <div className="text-3xl mb-2">🏆</div>
+            <div className="text-gray-600">No tournament history yet</div>
+            <div className="text-sm text-gray-500 mt-1">
+              Participate in tournaments to see your history here!
+            </div>
+          </div>
+        )}
 
           {/* Session Completion Bonuses */}
           <div className="mb-6 p-4 bg-yellow-50 rounded-lg">
@@ -6191,6 +7199,95 @@ const VEXLifetimeAchievementSystem = () => {
                   ))}
               </div>
             )}
+            {recentTournaments.length > 0 && (
+  <div className="mb-6 mt-8">
+    <h3 className="text-lg font-semibold mb-3 flex items-center justify-between">
+      <span>🏆 Recent Tournaments</span>
+      <button
+        onClick={() => setShowTournamentHistory(true)}
+        className="text-sm text-blue-600 hover:text-blue-800 font-normal"
+      >
+        View All →
+      </button>
+    </h3>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      {recentTournaments.map(tournament => {
+        // Get champion names
+        const champions = tournament.results.finalRankings
+          .filter(r => r.rank === 1)
+          .map(r => {
+            const team = teams.find(t => t.id === r.teamId);
+            return team ? team.name : "Unknown";
+          })
+          .join(" & ");
+        
+        // Format date
+        const tournamentDate = new Date(tournament.completedAt || tournament.createdAt);
+        const formattedDate = tournamentDate.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric'
+        });
+        
+        // Get participant count
+        const participantCount = tournament.teams.length;
+        
+        return (
+          <div
+            key={tournament.id}
+            className="bg-white border border-gray-200 p-4 rounded-lg hover:shadow-md transition-shadow cursor-pointer"
+            onClick={() => handleViewHistoricalTournament(tournament)}
+          >
+            {/* Tournament Header */}
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">
+                  {tournament.format === 'teamwork' ? '🤝' :
+                   tournament.format === 'driver' ? '🎮' : '🤖'}
+                </span>
+                <div>
+                  <h4 className="font-semibold text-gray-800">
+                    {tournament.name}
+                  </h4>
+                  <p className="text-xs text-gray-500">{formattedDate}</p>
+                </div>
+              </div>
+              <span className={`text-xs px-2 py-1 rounded-full ${
+                tournament.format === 'teamwork' ? 'bg-blue-100 text-blue-700' :
+                tournament.format === 'driver' ? 'bg-green-100 text-green-700' :
+                'bg-purple-100 text-purple-700'
+              }`}>
+                {tournament.format === 'teamwork' ? 'Team' :
+                 tournament.format === 'driver' ? 'Driver' : 'Auto'}
+              </span>
+            </div>
+            
+            {/* Tournament Stats */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-600">Teams:</span>
+                <span className="font-medium">{participantCount}</span>
+              </div>
+              
+              <div className="border-t pt-2">
+                <div className="flex items-center gap-1">
+                  <span className="text-sm">🥇</span>
+                  <span className="text-sm font-semibold text-gray-800 truncate">
+                    {champions}
+                  </span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Hover hint */}
+            <div className="mt-3 text-xs text-gray-500 text-center">
+              Click to view details
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  </div>
+)}
           </div>
         ) : (
           <div>
@@ -6324,7 +7421,23 @@ const VEXLifetimeAchievementSystem = () => {
       )}
       {showTournamentWizard && <TournamentWizard />}
       {showTournamentDashboard && <TournamentDashboard />}
+      {showTournamentHistory && (
+  <TournamentHistory
+    tournaments={tournaments}
+    sessions={sessions}
+    teams={teams}
+    students={students}
+    onClose={() => setShowTournamentHistory(false)}
+    onViewTournament={handleViewHistoricalTournament}
+  />
+)}
       {showAwardsCeremony && <AwardsCeremony />}
+      {selectedHistoricalTournament && (
+  <TournamentDetailsModal
+    tournament={selectedHistoricalTournament}
+    onClose={() => setSelectedHistoricalTournament(null)}
+  />
+)}
     </div>
   );
 };
