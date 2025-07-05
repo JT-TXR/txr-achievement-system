@@ -11,6 +11,16 @@ import {
 import MilestoneProgressDisplay from "./MilestoneProgressDisplay";
 import StudentBadgeView from "./StudentBadgeView";
 import BadgeDisplay from "./BadgeDisplay";
+import { 
+  processTXRTournamentAchievements,  // Changed from processTournamentAchievements
+  checkMultiYearAwards,
+  TXR_TOURNAMENT_ACHIEVEMENTS,      // Changed from COMPETITION_HONORS
+  COMPETITION_HONORS,
+  ANNUAL_AWARDS,
+  MULTI_YEAR_AWARDS
+} from './CompetitionAchievementSystem';
+import AnnualAwardsModal from './AnnualAwardsModal';
+import CompetitionHonorsModal from './CompetitionHonorsModal';
 
 const VEXLifetimeAchievementSystem = () => {
   // Enhanced data structure with lifetime and session tracking
@@ -239,6 +249,8 @@ const VEXLifetimeAchievementSystem = () => {
   const [bulkSelectedStudents, setBulkSelectedStudents] = useState([]);
   const [showUnifiedXPAward, setShowUnifiedXPAward] = useState(false);
   const [showBadgeGallery, setShowBadgeGallery] = useState(false);
+  const [showAnnualAwards, setShowAnnualAwards] = useState(false);
+const [showCompetitionHonors, setShowCompetitionHonors] = useState(false);
 
   // Tournament Management States
   const [teams, setTeams] = useState([]);
@@ -763,8 +775,15 @@ const VEXLifetimeAchievementSystem = () => {
   //   };
 
   const awardAchievement = (studentId, achievementId) => {
+    console.log(`🎁 awardAchievement called: studentId=${studentId}, achievementId=${achievementId}`);
+
     const achievement = achievements.find((a) => a.id === achievementId);
-    if (!achievement) return;
+    console.log('🔍 Found achievement:', achievement);
+
+    if (!achievement) {
+      console.log('❌ Achievement not found!');
+     return;
+    }
 
     setStudents((prevStudents) =>
       prevStudents.map((student) => {
@@ -803,6 +822,34 @@ const VEXLifetimeAchievementSystem = () => {
         };
       })
     );
+  };
+
+  const createAndAwardAchievement = (studentId, achievementData) => {
+    // First, ensure the achievement exists in the system
+    const existingAchievement = achievements.find(a => 
+      a.name === achievementData.name && a.type === achievementData.type
+    );
+    
+    if (!existingAchievement) {
+      // Add to achievements
+      setAchievements(prev => [...prev, achievementData]);
+      
+      // Award to student with the achievement data directly
+      setStudents((prevStudents) =>
+        prevStudents.map((student) => {
+          if (student.id !== studentId) return student;
+  
+          return {
+            ...student,
+            achievements: [...(student.achievements || []), achievementData.id],
+            lifetimeXP: (student.lifetimeXP || 0) + achievementData.xp,
+          };
+        })
+      );
+    } else {
+      // Use existing awardAchievement function
+      awardAchievement(studentId, existingAchievement.id);
+    }
   };
 
   // // Award achievement - SIMPLE FINAL VERSION
@@ -6287,23 +6334,39 @@ const VEXLifetimeAchievementSystem = () => {
   };
 
   const updateStudentTournamentHistory = (tournament) => {
+    console.log('🏆 updateStudentTournamentHistory called with:', tournament);
     const updatedStudents = [...students];
     const tournamentTeams = teams.filter((t) =>
       tournament.teams.includes(t.id)
     );
 
+    console.log('👥 Tournament teams:', tournamentTeams);
+
+    const currentSessionObj = sessions.find(s => s.name === currentSession);
+    const sessionCategory = getSessionCategory(currentSessionObj);
+
+    console.log('📅 Current session:', currentSession);
+    console.log('🏷️ Session category:', sessionCategory);
+
     // Process each student's results
     tournament.results.finalRankings.forEach((ranking) => {
+      console.log('🏅 Processing ranking:', ranking);
+
       const team = tournamentTeams.find((t) => t.id === ranking.teamId);
       if (!team) return;
 
+      console.log('👥 Processing team:', team);
+
       team.studentIds.forEach((studentId) => {
+        console.log(`👤 Processing student: ${studentId}`);
+
         const studentIndex = updatedStudents.findIndex(
           (s) => s.id === studentId
         );
         if (studentIndex === -1) return;
 
         const student = updatedStudents[studentIndex];
+        console.log('📋 Student data:', student);
 
         // Create tournament history entry
         const historyEntry = {
@@ -6403,12 +6466,79 @@ const VEXLifetimeAchievementSystem = () => {
           (a, b) => b.count - a.count
         );
 
-        updatedStudents[studentIndex] = student;
-      });
-    });
+// NEW: Check for TXR tournament achievements
+console.log('🎮 Checking for TXR achievements...');
+const txrAchievements = processTXRTournamentAchievements(
+  tournament, 
+  studentId, 
+  teams, 
+  students
+);
 
-    setStudents(updatedStudents);
-  };
+console.log('🏆 TXR achievements earned:', txrAchievements);
+
+// Award each earned TXR achievement
+txrAchievements.forEach(achievement => {
+  console.log(`🎯 Awarding ${achievement.name} to ${student.name}`);
+  
+  // For TXR achievements, they're session-based
+  const currentSessionAchievements = student.sessionAchievements?.[currentSession] || [];
+  
+  // Check if already earned this session
+  const alreadyEarned = currentSessionAchievements.some(achId => {
+    const ach = achievements.find(a => a.id === achId);
+    return ach && ach.name === achievement.name;
+  });
+
+  console.log(`Already earned? ${alreadyEarned}`);
+
+  if (!alreadyEarned) {
+    // Create the achievement
+    const newAchievement = {
+      id: `txr-${achievement.id}-${Date.now()}`,
+      name: achievement.name,
+      icon: achievement.icon,
+      description: achievement.description,
+      xp: achievement.xp,
+      type: 'session',
+      category: sessionCategory
+    };
+    
+    console.log('Creating new achievement:', newAchievement);
+    
+    // Add to achievements array (this will happen after the function completes)
+    setAchievements(prev => [...prev, newAchievement]);
+    
+    // DIRECTLY update the student object we're modifying
+    student.sessionAchievements = {
+      ...student.sessionAchievements,
+      [currentSession]: [...currentSessionAchievements, newAchievement.id]
+    };
+    
+    // Add XP directly
+    const currentSessionXP = student.sessionXP?.[currentSession] || 0;
+    student.sessionXP = {
+      ...student.sessionXP,
+      [currentSession]: currentSessionXP + newAchievement.xp
+    };
+    
+    // Add lifetime XP (30% of session XP)
+    student.lifetimeXP = (student.lifetimeXP || 0) + Math.floor(newAchievement.xp * 0.3);
+    
+    console.log(`✅ Directly updated ${student.name} with ${newAchievement.name}`);
+    console.log(`   Session XP: ${currentSessionXP} → ${currentSessionXP + newAchievement.xp}`);
+    console.log(`   Lifetime XP: ${student.lifetimeXP - Math.floor(newAchievement.xp * 0.3)} → ${student.lifetimeXP}`);
+  }
+});
+
+// Make sure we're updating the student in the array
+updatedStudents[studentIndex] = student;
+});
+});
+
+setStudents(updatedStudents);
+console.log('✅ updateStudentTournamentHistory complete');
+};
 
   const TournamentDetailsModal = ({ tournament, onClose }) => {
     if (!tournament) return null;
@@ -7305,96 +7435,153 @@ const VEXLifetimeAchievementSystem = () => {
             })()}
           </div>
 
-          {/* Badge Preview */}
-          <div className="mb-6">
-            <h3 className="font-bold text-lg mb-3 flex items-center justify-between">
-              <span>🏅 Badge Collection</span>
-              <button
-                onClick={() => setShowBadgeGallery(true)}
-                className="text-sm text-blue-600 hover:text-blue-800 font-normal"
-              >
-                View All Badges →
-              </button>
-            </h3>
+{/* Badge Preview */}
+<div className="mb-6">
+  <h3 className="font-bold text-lg mb-3 flex items-center justify-between">
+    <span>🏅 Badge Collection</span>
+    <button
+      onClick={() => setShowBadgeGallery(true)}
+      className="text-sm text-blue-600 hover:text-blue-800 font-normal"
+    >
+      View All Badges →
+    </button>
+  </h3>
 
-            {/* Show a preview of earned badges */}
-            <div className="flex gap-2 flex-wrap">
-              {(() => {
-                const allEarnedBadges = [];
+  {/* Show a preview of earned badges */}
+  <div className="flex gap-2 flex-wrap">
+    {(() => {
+      const allEarnedBadges = [];
 
-                // Add session milestone badges
-                const sessionMilestones =
-                  studentMilestones[currentStudent.id]?.[currentSession] || [];
-                const sessionBadgeIcons = {
-                  "perfect-attendance": "📅",
-                  "early-bird": "🐦",
-                  "cleanup-champion": "🧹",
-                  "documentation-expert": "📓",
-                  "session-complete": "✅",
-                  "ultimate-collaborator": "🤝",
-                };
+      // Add lifetime achievement badges with XP values
+      currentStudent.achievements?.forEach((achievementId) => {
+        const ach = achievements.find((a) => a.id === achievementId);
+        if (ach) {
+          const badgeIcon = {
+            // Lifetime Achievements
+            "First Robot": { icon: "🤖", name: "First Robot", xp: 50 },
+            "First Program": { icon: "💻", name: "First Program", xp: 50 },
+            "First Engineering Notebook": { icon: "📓", name: "First Notebook", xp: 50 },
+            "TXR Achiever": { icon: "🔰", name: "TXR Achiever", xp: 100 },
+            "TXR Veteran": { icon: "🛠️", name: "TXR Veteran", xp: 200 },
+            "Attendance Champion": { icon: "🏅", name: "Attendance Champion", xp: 150 },
+            
+            // Competition Honors - Major Awards
+            "Tournament Champion": { icon: "🏆", name: "Tournament Champion", xp: 350 },
+            "Robot Skills Champion": { icon: "🎮", name: "Robot Skills Champion", xp: 350 },
+            "Excellence Award": { icon: "👑", name: "Excellence Award", xp: 500 },
+            "Double Crown": { icon: "🏵️", name: "Double Crown", xp: 750 },
+            "Triple Crown": { icon: "💎", name: "Triple Crown", xp: 1000 },
+            
+            // Competition Honors - Judged Awards
+            "Design Award": { icon: "📐", name: "Design Award", xp: 200 },
+            "Think Award": { icon: "🧠", name: "Think Award", xp: 200 },
+            "Innovate Award": { icon: "💡", name: "Innovate Award", xp: 200 },
+            "Build Award": { icon: "🔨", name: "Build Award", xp: 200 },
+            "Create Award": { icon: "🎨", name: "Create Award", xp: 200 },
+            "Amaze Award": { icon: "✨", name: "Amaze Award", xp: 200 },
+            "Inspire Award": { icon: "🌟", name: "Inspire Award", xp: 200 },
+            "Sportsmanship Award": { icon: "🤝", name: "Sportsmanship Award", xp: 200 },
+            "Judges' Award": { icon: "⭐", name: "Judges' Award", xp: 200 },
+            "Tournament Competitor": { icon: "🚩", name: "Tournament Competitor", xp: 50 },
+            
+            // Annual Awards
+            "Robotics Student of the Year": { icon: "🏅", name: "Student of the Year", xp: 500 },
+            "Leadership Excellence": { icon: "🌟", name: "Leadership Excellence", xp: 300 },
+            "Competitive Spirit": { icon: "💪", name: "Competitive Spirit", xp: 200 },
+            "Program Ambassador": { icon: "🗣️", name: "Program Ambassador", xp: 250 },
+            
+            // Multi-Year Recognition
+            "Returner Award": { icon: "🔁", name: "Returner Award", xp: 100 },
+            "Loyalty Award": { icon: "💎", name: "Loyalty Award", xp: 200 },
+            "Dedication Medal": { icon: "🎖️", name: "Dedication Medal", xp: 300 },
+            "Legacy Honor": { icon: "🏛️", name: "Legacy Honor", xp: 500 },
+          };
+          
+          const badge = badgeIcon[ach.name];
+          if (badge) {
+            allEarnedBadges.push({ ...badge, priority: badge.xp });
+          }
+        }
+      });
 
-                sessionMilestones.forEach((milestone) => {
-                  if (sessionBadgeIcons[milestone]) {
-                    allEarnedBadges.push({
-                      icon: sessionBadgeIcons[milestone],
-                      name: milestone,
-                    });
-                  }
-                });
+           // Add TXR tournament achievements (session achievements)
+      const sessionAchievements = currentStudent.sessionAchievements?.[currentSession] || [];
+      sessionAchievements.forEach((achievementId) => {
+        const ach = achievements.find((a) => a.id === achievementId);
+        if (ach) {
+          const txrBadgeIcons = {
+            "TXR Tournament Participant": { icon: "🎯", name: "TXR Participant", priority: 25 },
+            "TXR Teamwork Champion": { icon: "🤝", name: "TXR Teamwork Champion", priority: 50 },
+            "TXR Skills Champion": { icon: "🎮", name: "TXR Skills Champion", priority: 50 },
+            "TXR Podium Finish": { icon: "🏅", name: "TXR Podium Finish", priority: 35 },
+            "TXR Perfect Score": { icon: "💯", name: "TXR Perfect Score", priority: 40 },
+          };
+          
+          const badge = txrBadgeIcons[ach.name];
+          if (badge) {
+            allEarnedBadges.push({ ...badge });
+          }
+        }
+      });
 
-                // Add lifetime achievement badges
-                const lifetimeAchievementBadges = {
-                  "First Robot": { icon: "🤖", name: "First Robot" },
-                  "First Program": { icon: "💻", name: "First Program" },
-                  "First Engineering Notebook": {
-                    icon: "📓",
-                    name: "First Notebook",
-                  },
-                  "TXR Achiever": { icon: "🔰", name: "TXR Achiever" },
-                  "TXR Veteran": { icon: "🛠️", name: "TXR Veteran" },
-                  "Attendance Champion": {
-                    icon: "🏅",
-                    name: "Attendance Champion",
-                  },
-                };
-                currentStudent.achievements?.forEach((achievementId) => {
-                  const ach = achievements.find((a) => a.id === achievementId);
-                  if (ach && lifetimeAchievementBadges[ach.name]) {
-                    allEarnedBadges.push(lifetimeAchievementBadges[ach.name]);
-                  }
-                });
+      // Add session milestone badges with lower priority
+      const sessionMilestones = studentMilestones[currentStudent.id]?.[currentSession] || [];
+      const sessionXP = currentStudent.sessionXP?.[currentSession] || 0;
+if (sessionXP >= 100) {
+  allEarnedBadges.push({
+    icon: "🔥",
+    name: "Session Champion",
+    priority: 60
+  });
+}
+      const sessionBadgeIcons = {
+        "perfect-attendance": { icon: "📅", name: "Perfect Attendance", priority: 25 },
+        "early-bird": { icon: "🐦", name: "Early Bird", priority: 25 },
+        "cleanup-champion": { icon: "🧹", name: "Clean-Up Champion", priority: 25 },
+        "documentation-expert": { icon: "📓", name: "Documentation Expert", priority: 25 },
+        "session-complete": { icon: "✅", name: "Session Complete", priority: 40 },
+        "ultimate-collaborator": { icon: "🤝", name: "Ultimate Collaborator", priority: 50 },
+      };
 
-                // Show first 8 badges
-                return allEarnedBadges.slice(0, 8).map((badge, idx) => (
-                  <div
-                    key={idx}
-                    className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center ring-2 ring-blue-400"
-                    title={badge.name}
-                  >
-                    <span className="text-xl">{badge.icon}</span>
-                  </div>
-                ));
-              })()}
+      sessionMilestones.forEach((milestone) => {
+        if (sessionBadgeIcons[milestone]) {
+          allEarnedBadges.push(sessionBadgeIcons[milestone]);
+        }
+      });
 
-              {/* Show more indicator */}
-              {(() => {
-                const totalBadges =
-                  (studentMilestones[currentStudent.id]?.[currentSession]
-                    ?.length || 0) + (currentStudent.achievements?.length || 0);
+      // Sort by priority (XP value) descending
+      allEarnedBadges.sort((a, b) => b.priority - a.priority);
 
-                if (totalBadges > 8) {
-                  return (
-                    <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center ring-2 ring-gray-400">
-                      <span className="text-sm font-bold text-gray-600">
-                        +{totalBadges - 8}
-                      </span>
-                    </div>
-                  );
-                }
-              })()}
-            </div>
+      // Show top 8 badges
+      return allEarnedBadges.slice(0, 8).map((badge, idx) => (
+        <div
+          key={idx}
+          className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center ring-2 ring-blue-400"
+          title={`${badge.name} (${badge.priority} XP)`}
+        >
+          <span className="text-xl">{badge.icon}</span>
+        </div>
+      ));
+    })()}
+
+    {/* Show more indicator */}
+    {(() => {
+      const totalBadges =
+        (studentMilestones[currentStudent.id]?.[currentSession]?.length || 0) + 
+        (currentStudent.achievements?.length || 0);
+
+      if (totalBadges > 8) {
+        return (
+          <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center ring-2 ring-gray-400">
+            <span className="text-sm font-bold text-gray-600">
+              +{totalBadges - 8}
+            </span>
           </div>
+        );
+      }
+    })()}
+  </div>
+</div>
 
           {/* Manual Milestone Check */}
           <div className="mb-6 p-4 bg-yellow-50 rounded-lg">
@@ -7560,6 +7747,9 @@ const VEXLifetimeAchievementSystem = () => {
         setShowStudentManager={setShowStudentManager}
         setShowAchievementManager={setShowAchievementManager}
         setShowSettings={setShowSettings}
+
+        setShowCompetitionHonors={setShowCompetitionHonors}
+        setShowAnnualAwards={setShowAnnualAwards}
       />
       <div className="max-w-7xl mx-auto p-6">
         {currentView === "dashboard" ? (
@@ -7878,6 +8068,23 @@ const VEXLifetimeAchievementSystem = () => {
         />
       )}
       {showSettings && <SettingsModal />}
+      {showCompetitionHonors && (
+  <CompetitionHonorsModal
+    students={students}
+    currentSession={currentSession}
+    achievements={achievements}
+    onClose={() => setShowCompetitionHonors(false)}
+    onAwardAchievement={createAndAwardAchievement}
+  />
+)}
+{showAnnualAwards && (
+  <AnnualAwardsModal
+    students={students}
+    currentSession={currentSession}
+    onClose={() => setShowAnnualAwards(false)}
+    onAwardAchievement={createAndAwardAchievement}
+  />
+)}
     </div>
   );
 };

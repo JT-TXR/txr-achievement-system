@@ -34,6 +34,8 @@ const NavigationBar = ({
   setShowSessionManager,
   setShowStudentManager,
   setShowAchievementManager,
+  setShowCompetitionHonors,
+setShowAnnualAwards,
   setShowSettings,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -183,6 +185,22 @@ const NavigationBar = ({
           action: () => {
             setShowAchievementManager(true);
           },
+        },
+        {
+          icon: '🏆',
+          label: 'Competition Honors',
+          action: () => {
+            setShowCompetitionHonors(true);
+          },
+          description: 'Award real VEX competition honors'
+        },
+        {
+          icon: '⭐',
+          label: 'Annual Awards',
+          action: () => {
+            setShowAnnualAwards(true);
+          },
+          description: 'Grant special annual awards'
         },
         { divider: true },
         {

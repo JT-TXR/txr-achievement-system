@@ -85,7 +85,7 @@ const StudentBadgeView = ({
         {
           id: "session-champion",
           name: "Session Champion",
-          icon: "🏆",
+          icon: "🔥",
           type: "session",
           criteria: "Earn 100+ session XP",
         },
@@ -136,64 +136,146 @@ const StudentBadgeView = ({
         },
       ],
 
-      competition: [
-        {
-          id: "tournament-competitor",
-          name: "Tournament Competitor",
-          icon: "🚩",
-          type: "competition",
-          criteria: "Attend an official VEX competition",
-        },
-        {
-          id: "excellence-award",
-          name: "Excellence Award",
-          icon: "👑",
-          type: "competition",
-          criteria: "Win real-life Excellence Award",
-        },
-        {
-          id: "skills-champion",
-          name: "Skills Champion",
-          icon: "🎮",
-          type: "competition",
-          criteria: "Win Robot Skills Award",
-        },
-        {
-          id: "teamwork-champion",
-          name: "Teamwork Champion",
-          icon: "🤝",
-          type: "competition",
-          criteria: "Win Teamwork Challenge",
-        },
-        {
-          id: "think-award",
-          name: "Think Award",
-          icon: "🧠",
-          type: "competition",
-          criteria: "Win Think Award",
-        },
-        {
-          id: "innovate-award",
-          name: "Innovate Award",
-          icon: "💡",
-          type: "competition",
-          criteria: "Win Innovate Award",
-        },
-        {
-          id: "double-crown",
-          name: "Double Crown",
-          icon: "👑",
-          type: "competition",
-          criteria: "Win 2 major awards in 1 tournament",
-        },
-        {
-          id: "triple-crown",
-          name: "Triple Crown",
-          icon: "💎",
-          type: "competition",
-          criteria: "Win Excellence, Teamwork & Skills",
-        },
-      ],
+    // Add TXR Tournament badges (for in-class)
+    txrTournament: [
+      {
+        id: "txr-participant",
+        name: "TXR Participant",
+        icon: "🎯",
+        type: "txrTournament",
+        criteria: "Participated in TXR tournament",
+      },
+      {
+        id: "txr-teamwork-champion",
+        name: "TXR Teamwork Champion",
+        icon: "🤝",
+        type: "txrTournament",
+        criteria: "Won TXR teamwork tournament",
+      },
+      {
+        id: "txr-skills-champion",
+        name: "TXR Skills Champion",
+        icon: "🎮",
+        type: "txrTournament",
+        criteria: "Won TXR skills tournament",
+      },
+      {
+        id: "txr-podium",
+        name: "TXR Podium Finish",
+        icon: "🏅",
+        type: "txrTournament",
+        criteria: "Top 3 in TXR tournament",
+      },
+    ],
+
+    // Update competition badges for real VEX
+    competition: [
+      {
+        id: "tournament-competitor",
+        name: "Tournament Competitor",
+        icon: "🚩",
+        type: "competition",
+        criteria: "Competed in official VEX tournament",
+      },
+      {
+        id: "tournament-champion",
+        name: "Tournament Champion",
+        icon: "🏆",
+        type: "competition",
+        criteria: "Won Teamwork Champion at VEX tournament",
+      },
+      {
+        id: "skills-champion",
+        name: "Skills Champion",
+        icon: "🎮",
+        type: "competition",
+        criteria: "Won Robot Skills at VEX tournament",
+      },
+      {
+        id: "excellence-award",
+        name: "Excellence Award",
+        icon: "👑",
+        type: "competition",
+        criteria: "Won Excellence Award at VEX tournament",
+      },
+      {
+        id: "think-award",
+        name: "Think Award",
+        icon: "🧠",
+        type: "competition",
+        criteria: "Won Think Award at VEX tournament",
+      },
+      {
+        id: "innovate-award",
+        name: "Innovate Award",
+        icon: "💡",
+        type: "competition",
+        criteria: "Won Innovate Award at VEX tournament",
+      },
+      {
+        id: "build-award",
+        name: "Build Award",
+        icon: "🔨",
+        type: "competition",
+        criteria: "Won Build Award at VEX tournament",
+      },
+      {
+        id: "design-award",
+        name: "Design Award",
+        icon: "📐",
+        type: "competition",
+        criteria: "Won Design Award at VEX tournament",
+      },
+      {
+        id: "create-award",
+        name: "Create Award",
+        icon: "🎨",
+        type: "competition",
+        criteria: "Won Create Award at VEX tournament",
+      },
+      {
+        id: "amaze-award",
+        name: "Amaze Award",
+        icon: "✨",
+        type: "competition",
+        criteria: "Won Amaze Award at VEX tournament",
+      },
+      {
+        id: "inspire-award",
+        name: "Inspire Award",
+        icon: "🌟",
+        type: "competition",
+        criteria: "Won Inspire Award at VEX tournament",
+      },
+      {
+        id: "sportsmanship-award",
+        name: "Sportsmanship Award",
+        icon: "🤝",
+        type: "competition",
+        criteria: "Won Sportsmanship at VEX tournament",
+      },
+      {
+        id: "judges-award",
+        name: "Judges' Award",
+        icon: "⭐",
+        type: "competition",
+        criteria: "Won Judges' Award at VEX tournament",
+      },
+      {
+        id: "double-crown",
+        name: "Double Crown",
+        icon: "🏵️",
+        type: "competition",
+        criteria: "Won 2 major awards at same VEX tournament",
+      },
+      {
+        id: "triple-crown",
+        name: "Triple Crown",
+        icon: "💎",
+        type: "competition",
+        criteria: "Won Excellence, Tournament & Skills",
+      },
+    ],
 
       annual: [
         {
@@ -239,6 +321,13 @@ const StudentBadgeView = ({
           criteria: "Mentor others consistently",
         },
         {
+          id: "competitive-spirit",
+          name: "Competitive Spirit",
+          icon: "💪",
+          type: "annual",
+          criteria: "Best sportsmanship and attitude",
+        },
+        {
           id: "program-ambassador",
           name: "Program Ambassador",
           icon: "🗣️",
@@ -266,6 +355,7 @@ const StudentBadgeView = ({
       lifetime: [],
       competition: [],
       annual: [],
+      txrTournament: [],
     };
 
     // Check daily badges based on tracking
@@ -328,18 +418,98 @@ const StudentBadgeView = ({
       });
     }
 
-    // Check competition badges based on tournament history
-    if (student.tournamentHistory) {
-      student.tournamentHistory.forEach((tournament) => {
+// Check competition badges based on achievements
+if (student.achievements) {
+  student.achievements.forEach((achievementId) => {
+    const achievement = achievements.find((a) => a.id === achievementId);
+    if (achievement) {
+      // Check for VEX Competition Honors (real-life)
+      if (achievement.name === "Tournament Competitor") {
         earned.competition.push("tournament-competitor");
-
-        // Check for specific awards (would need to track these in tournament results)
-        if (tournament.placement === 1) {
-          earned.competition.push("teamwork-champion");
-        }
-      });
+      }
+      if (achievement.name === "Tournament Champion") {
+        earned.competition.push("tournament-champion");
+      }
+      if (achievement.name === "Robot Skills Champion") {
+        earned.competition.push("skills-champion");
+      }
+      if (achievement.name === "Excellence Award") {
+        earned.competition.push("excellence-award");
+      }
+      if (achievement.name === "Think Award") {
+        earned.competition.push("think-award");
+      }
+      if (achievement.name === "Innovate Award") {
+        earned.competition.push("innovate-award");
+      }
+      if (achievement.name === "Build Award") {
+        earned.competition.push("build-award");
+      }
+      if (achievement.name === "Design Award") {
+        earned.competition.push("design-award")
+      }
+      if (achievement.name === "Create Award") {
+        earned.competition.push("create-award");
+      }
+      if (achievement.name === "Amaze Award") {
+        earned.competition.push("amaze-award");
+      }
+      if (achievement.name === "Inspire Award") {
+        earned.competition.push("inspire-award");
+      }
+      if (achievement.name === "Sportsmanship Award") {
+        earned.competition.push("sportsmanship-award");
+      }
+      if (achievement.name === "Double Crown") {
+        earned.competition.push("double-crown");
+      }
+      if (achievement.name === "Triple Crown") {
+        earned.competition.push("triple-crown");
+      }
+      if (achievement.name === "Judges' Award") {
+        earned.competition.push("judges-award");
+      }
+      
+      // Annual Awards
+      if (achievement.name === "Robotics Student of the Year") {
+        earned.annual.push("student-of-year");
+      }
+      if (achievement.name === "Leadership Excellence") {
+        earned.annual.push("leadership-excellence");
+      }
+      if (achievement.name === "Competitive Spirit") {
+        earned.annual.push("competitive-spirit");
+      }
+      if (achievement.name === "Program Ambassador") {
+        earned.annual.push("program-ambassador");
+      }
     }
+  });
+}
 
+// Check TXR tournament achievements (session achievements)
+if (student.sessionAchievements?.[currentSession]) {
+  student.sessionAchievements[currentSession].forEach((achievementId) => {
+    const achievement = achievements.find((a) => a.id === achievementId);
+    if (achievement) {
+      console.log('Checking session achievement:', achievement);
+      
+      // TXR Tournament achievements
+      if (achievement.name === "TXR Tournament Participant") {
+        earned.txrTournament.push("txr-participant");
+      }
+      if (achievement.name === "TXR Teamwork Champion") {
+        earned.txrTournament.push("txr-teamwork-champion");
+      }
+      if (achievement.name === "TXR Skills Champion") {
+        earned.txrTournament.push("txr-skills-champion");
+      }
+      if (achievement.name === "TXR Podium Finish") {
+        earned.txrTournament.push("txr-podium");
+      }
+    }
+  });
+}
     // Check annual badges based on years in program
     const yearsInProgram = calculateYearsInProgram(student);
     if (yearsInProgram >= 2) earned.annual.push("returner-award");
@@ -440,6 +610,22 @@ const StudentBadgeView = ({
         studentBadges={earnedBadges.session}
       />
 
+      {/* TXR Tournament Badges */}
+<BadgeGallery
+  title="TXR Tournament Achievements"
+  type="txrTournament"
+  badges={badges.txrTournament}
+  studentBadges={earnedBadges.txrTournament}
+/>
+
+{/* Real VEX Competition Honors */}
+<BadgeGallery
+  title="VEX Competition Honors"
+  type="competition"
+  badges={badges.competition}
+  studentBadges={earnedBadges.competition}
+/>
+
       {/* Lifetime Achievement Badges */}
       <BadgeGallery
         title="Lifetime Achievements"
@@ -449,14 +635,6 @@ const StudentBadgeView = ({
           progress: getBadgeProgress(badge),
         }))}
         studentBadges={earnedBadges.lifetime}
-      />
-
-      {/* Competition Honors */}
-      <BadgeGallery
-        title="Competition Honors"
-        type="competition"
-        badges={badges.competition}
-        studentBadges={earnedBadges.competition}
       />
 
       {/* Multi-Year & Annual Awards */}
