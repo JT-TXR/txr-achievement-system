@@ -3,6 +3,7 @@ import React, { useState } from "react";
 
 const NavigationBar = ({
   // View state
+  onRoadmapClick,
   currentView,
   setCurrentView,
   currentSession,
@@ -35,10 +36,11 @@ const NavigationBar = ({
   setShowStudentManager,
   setShowAchievementManager,
   setShowCompetitionHonors,
-setShowAnnualAwards,
+  setShowAnnualAwards,
   setShowSettings,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [activeDropdown, setActiveDropdown] = useState(null);
 
   // Check for active tournament in current session
   const hasActiveTournament = tournaments?.some(
@@ -60,13 +62,13 @@ setShowAnnualAwards,
             setShowAttendanceManager(true);
           },
         },
-        { 
-          icon: '🌟', 
-          label: 'Award XP', 
+        {
+          icon: "🌟",
+          label: "Award XP",
           action: () => {
             setShowUnifiedXPAward(true);
           },
-          description: 'Award daily XP and achievements'
+          description: "Award daily XP and achievements",
         },
         {
           icon: "👥",
@@ -156,6 +158,14 @@ setShowAnnualAwards,
             setShowAttendanceReport(true);
           },
         },
+        {
+          icon: "🗺️",
+          label: "Level Roadmap",
+          action: () => {
+            onRoadmapClick(); // This will be passed from App.js
+          },
+          description: "View student progression levels",
+        },
       ],
     },
     {
@@ -187,20 +197,20 @@ setShowAnnualAwards,
           },
         },
         {
-          icon: '🏆',
-          label: 'Competition Honors',
+          icon: "🏆",
+          label: "Competition Honors",
           action: () => {
             setShowCompetitionHonors(true);
           },
-          description: 'Award real VEX competition honors'
+          description: "Award real VEX competition honors",
         },
         {
-          icon: '⭐',
-          label: 'Annual Awards',
+          icon: "⭐",
+          label: "Annual Awards",
           action: () => {
             setShowAnnualAwards(true);
           },
-          description: 'Grant special annual awards'
+          description: "Grant special annual awards",
         },
         { divider: true },
         {
