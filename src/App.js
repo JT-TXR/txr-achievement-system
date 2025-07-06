@@ -1,6 +1,28 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { User, Calendar, Award, Trophy } from 'lucide-react';
 import { initializeTestData } from "./testData";
 import NavigationBar from "./NavigationBar";
+import UnifiedXPAwardModal from "./UnifiedXPAwardModal";
+import {
+  checkAllMilestones,
+  getMilestoneProgress,
+  SESSION_MILESTONES,
+  LIFETIME_ACHIEVEMENTS,
+} from "./MilestoneTrackingSystem";
+import MilestoneProgressDisplay from "./MilestoneProgressDisplay";
+import StudentBadgeView from "./StudentBadgeView";
+import BadgeDisplay from "./BadgeDisplay";
+import {
+  processTXRTournamentAchievements, // Changed from processTournamentAchievements
+  checkMultiYearAwards,
+  TXR_TOURNAMENT_ACHIEVEMENTS, // Changed from COMPETITION_HONORS
+  COMPETITION_HONORS,
+  ANNUAL_AWARDS,
+  MULTI_YEAR_AWARDS,
+} from "./CompetitionAchievementSystem";
+import AnnualAwardsModal from "./AnnualAwardsModal";
+import CompetitionHonorsModal from "./CompetitionHonorsModal";
+import LevelRoadmap from "./LevelProgressionRoadmap.js";
 
 const VEXLifetimeAchievementSystem = () => {
   // Enhanced data structure with lifetime and session tracking
@@ -8,7 +30,7 @@ const VEXLifetimeAchievementSystem = () => {
   const [achievements, setAchievements] = useState([
     // === Core Lifetime Achievements ===
     {
-      id: 1,
+      id: "first-robot-lifetime",
       name: "First Robot",
       icon: "🤖",
       description: "Build your very first robot",
@@ -16,51 +38,43 @@ const VEXLifetimeAchievementSystem = () => {
       type: "lifetime",
     },
     {
-      id: 2,
-      name: "Code Master",
+      id: "first-program-lifetime",
+      name: "First Program",
       icon: "💻",
-      description: "Write 10 successful programs",
+      description: "Write your first program",
+      xp: 50,
+      type: "lifetime",
+    },
+    {
+      id: "first-notebook-lifetime",
+      name: "First Engineering Notebook",
+      icon: "📓",
+      description: "Complete your first notebook entry",
+      xp: 50,
+      type: "lifetime",
+    },
+    {
+      id: "txr-achiever-lifetime",
+      name: "TXR Achiever",
+      icon: "🌟",
+      description: "Complete 4 sessions",
       xp: 100,
       type: "lifetime",
     },
     {
-      id: 3,
-      name: "VEX Veteran",
+      id: "txr-veteran-lifetime",
+      name: "TXR Veteran",
       icon: "⭐",
-      description: "Complete 5 camps/sessions",
+      description: "Complete 10 sessions",
       xp: 200,
       type: "lifetime",
     },
     {
-      id: 4,
-      name: "Mentor",
-      icon: "🌟",
-      description: "Help 10 different students",
-      xp: 150,
-      type: "lifetime",
-    },
-    {
-      id: 5,
-      name: "Summer Legend",
-      icon: "☀️",
-      description: "Complete all 7 summer camps",
-      xp: 500,
-      type: "lifetime",
-    },
-    {
-      id: 6,
-      name: "Consistent Builder",
-      icon: "🏗️",
-      description: "Earn Speed Builder in 4+ sessions",
-      xp: 200,
-      type: "lifetime",
-    },
-    {
-      id: 7,
+      id: "attendance-champion-lifetime",
       name: "Attendance Champion",
-      icon: "📅",
-      description: "Perfect attendance in 5+ sessions",
-      xp: 300,
+      icon: "🏅",
+      description: "5+ sessions with perfect attendance",
+      xp: 150,
       type: "lifetime",
     },
 
@@ -227,13 +241,18 @@ const VEXLifetimeAchievementSystem = () => {
   };
 
   const [selectedStudent, setSelectedStudent] = useState(null);
+  const [selectedStudentId, setSelectedStudentId] = useState(null);
   const [currentView, setCurrentView] = useState("dashboard");
   const [showStudentManager, setShowStudentManager] = useState(false);
   const [showAchievementManager, setShowAchievementManager] = useState(false);
   const [xpToAward, setXpToAward] = useState(10);
+  const [dailyXPTracking, setDailyXPTracking] = useState({});
   const [filterProgram, setFilterProgram] = useState("ALL");
-  const [showBulkAward, setShowBulkAward] = useState(false);
   const [bulkSelectedStudents, setBulkSelectedStudents] = useState([]);
+  const [showUnifiedXPAward, setShowUnifiedXPAward] = useState(false);
+  const [showBadgeGallery, setShowBadgeGallery] = useState(false);
+  const [showAnnualAwards, setShowAnnualAwards] = useState(false);
+  const [showCompetitionHonors, setShowCompetitionHonors] = useState(false);
 
   // Tournament Management States
   const [teams, setTeams] = useState([]);
@@ -258,6 +277,8 @@ const VEXLifetimeAchievementSystem = () => {
   //Settings States
   const [showSettings, setShowSettings] = useState(false);
   const [userRole, setUserRole] = useState("admin");
+  const [showLevelRoadmap, setShowLevelRoadmap] = useState(false);
+  const [currentViewingStudent, setCurrentViewingStudent] = useState(null);
 
   // Session completion milestones
   const sessionMilestones = {
@@ -267,23 +288,35 @@ const VEXLifetimeAchievementSystem = () => {
       lifetimeBonus: 25,
       icon: "📅",
     },
-    xpGoal: {
-      name: "Session Champion",
-      requirement: "Earn 100+ session XP",
-      lifetimeBonus: 50,
-      icon: "🏆",
+    earlybird: {
+      name: "Early Bird",
+      requirement: "Arrive early 5+ times",
+      lifetimeBonus: 25,
+      icon: "🐦",
     },
-    helper: {
-      name: "Team Builder",
-      requirement: "Help 3+ students",
-      lifetimeBonus: 30,
-      icon: "🤝",
+    cleanup: {
+      name: "Clean-Up Champion",
+      requirement: "Clean workspace 3+ times",
+      lifetimeBonus: 25,
+      icon: "🧹",
+    },
+    documentation: {
+      name: "Documentation Expert",
+      requirement: "Engineering notebook 3+ times",
+      lifetimeBonus: 25,
+      icon: "📓",
     },
     completion: {
       name: "Session Complete",
       requirement: "Complete the session",
       lifetimeBonus: 40,
       icon: "✅",
+    },
+    helper: {
+      name: "Ultimate Collaborator",
+      requirement: "Help teammates 3+ times",
+      lifetimeBonus: 50,
+      icon: "🤝",
     },
   };
 
@@ -339,6 +372,10 @@ const VEXLifetimeAchievementSystem = () => {
     if (savedTeams) setTeams(JSON.parse(savedTeams));
     if (savedMatches) setTeamworkMatches(JSON.parse(savedMatches));
     if (savedSkills) setSkillsScores(JSON.parse(savedSkills));
+
+    const savedDailyXPTracking = localStorage.getItem("vexDailyXPTracking");
+    if (savedDailyXPTracking)
+      setDailyXPTracking(JSON.parse(savedDailyXPTracking));
   }, []);
 
   // Validate current session
@@ -369,6 +406,53 @@ const VEXLifetimeAchievementSystem = () => {
     localStorage.setItem("vexCurrentSession", currentSession);
   }, [sessions, currentSession]);
 
+  // Save dailyXPTracking when it changes
+  useEffect(() => {
+    localStorage.setItem("vexDailyXPTracking", JSON.stringify(dailyXPTracking));
+  }, [dailyXPTracking]);
+
+  useEffect(() => {
+    if (!selectedStudent || !dailyXPTracking[selectedStudent.id]) return;
+
+    const { sessionMilestones, lifetimeAchievements } = checkAllMilestones(
+      selectedStudent.id,
+      currentSession,
+      dailyXPTracking,
+      students,
+      sessions,
+      attendance,
+      studentMilestones
+    );
+
+    sessionMilestones.forEach((milestone) => {
+      awardMilestone(selectedStudent.id, milestone.id);
+      console.log(`🎯 ${selectedStudent.name} earned ${milestone.name}`);
+    });
+
+    lifetimeAchievements.forEach((achievement) => {
+      const existing = achievements.find(
+        (a) => a.name === achievement.name && a.type === "lifetime"
+      );
+      if (!existing) {
+        const newAchievement = {
+          id: Date.now(),
+          name: achievement.name,
+          icon: achievement.icon,
+          description: achievement.description,
+          xp: achievement.xp,
+          type: "lifetime",
+        };
+        setAchievements((prev) => [...prev, newAchievement]);
+        awardAchievement(selectedStudent.id, newAchievement.id);
+      } else {
+        awardAchievement(selectedStudent.id, existing.id);
+      }
+      console.log(
+        `🏆 ${selectedStudent.name} earned lifetime achievement: ${achievement.name}`
+      );
+    });
+  }, [dailyXPTracking, selectedStudent, currentSession]);
+
   useEffect(() => {
     localStorage.setItem("vexAttendance", JSON.stringify(attendance));
   }, [attendance]);
@@ -392,13 +476,112 @@ const VEXLifetimeAchievementSystem = () => {
 
   // Calculate levels
   const levels = [
-    { level: 1, name: "VEX Rookie", minXP: 0, color: "bg-gray-500" },
-    { level: 2, name: "VEX Builder", minXP: 100, color: "bg-green-500" },
-    { level: 3, name: "VEX Programmer", minXP: 300, color: "bg-blue-500" },
-    { level: 4, name: "VEX Engineer", minXP: 600, color: "bg-purple-500" },
-    { level: 5, name: "VEX Expert", minXP: 1000, color: "bg-orange-500" },
-    { level: 6, name: "VEX Master", minXP: 1500, color: "bg-red-500" },
-    { level: 7, name: "VEX Legend", minXP: 2000, color: "bg-pink-500" },
+    {
+      level: 1,
+      name: "VEX Rookie",
+      minXP: 0,
+      color: "bg-gray-500",
+      textColor: "text-gray-100",
+    },
+    {
+      level: 2,
+      name: "VEX Explorer",
+      minXP: 150,
+      color: "bg-green-300",
+      textColor: "text-green-800",
+    },
+    {
+      level: 3,
+      name: "VEX Builder",
+      minXP: 400,
+      color: "bg-green-500",
+      textColor: "text-green-100",
+    },
+    {
+      level: 4,
+      name: "VEX Programmer",
+      minXP: 800,
+      color: "bg-blue-500",
+      textColor: "text-blue-100",
+    },
+    {
+      level: 5,
+      name: "VEX Innovator",
+      minXP: 1300,
+      color: "bg-purple-500",
+      textColor: "text-purple-100",
+    },
+    {
+      level: 6,
+      name: "VEX Specialist",
+      minXP: 2000,
+      color: "bg-orange-500",
+      textColor: "text-orange-100",
+    },
+    {
+      level: 7,
+      name: "VEX Expert",
+      minXP: 2800,
+      color: "bg-orange-700",
+      textColor: "text-orange-100",
+    },
+    {
+      level: 8,
+      name: "VEX Engineer",
+      minXP: 3800,
+      color: "bg-red-500",
+      textColor: "text-red-100",
+    },
+    {
+      level: 9,
+      name: "VEX Architect",
+      minXP: 5000,
+      color: "bg-red-700",
+      textColor: "text-red-100",
+    },
+    {
+      level: 10,
+      name: "VEX Master",
+      minXP: 6500,
+      color: "bg-pink-500",
+      textColor: "text-pink-100",
+    },
+    {
+      level: 11,
+      name: "TXR Champion",
+      minXP: 8200,
+      color: "bg-gray-400",
+      textColor: "text-gray-800",
+    },
+    {
+      level: 12,
+      name: "TXR Virtuoso",
+      minXP: 10000,
+      color: "bg-yellow-500",
+      textColor: "text-yellow-900",
+    },
+    {
+      level: 13,
+      name: "TXR Legend",
+      minXP: 12000,
+      color: "bg-slate-300",
+      textColor: "text-slate-800",
+    },
+    {
+      level: 14,
+      name: "TXR Hall-of-Famer 🏅",
+      minXP: 14000,
+      color: "bg-gradient-to-r from-blue-400 to-purple-400",
+      textColor: "text-white",
+    },
+    {
+      level: 15,
+      name: "TXR Immortal 🤖👑",
+      minXP: 15000,
+      color:
+        "bg-gradient-to-r from-red-400 via-yellow-400 via-green-400 via-blue-400 to-purple-400",
+      textColor: "text-white font-bold",
+    },
   ];
 
   const getStudentLevel = (xp) => {
@@ -456,118 +639,402 @@ const VEXLifetimeAchievementSystem = () => {
 
   // Award XP with hybrid system (30% of session XP goes to lifetime)
   const awardXP = (studentId, amount, isLifetime = false) => {
+    const student = students.find((s) => s.id === studentId);
+    if (!student) return;
+
+    const updatedStudent = { ...student };
+    const currentLifetimeXP =
+      typeof student.lifetimeXP === "number" ? student.lifetimeXP : 0;
+
+    if (isLifetime) {
+      updatedStudent.lifetimeXP = currentLifetimeXP + amount;
+    } else {
+      const currentSessionXP = student.sessionXP?.[currentSession] || 0;
+      const lifetimeContribution = Math.floor(amount * 0.3);
+      updatedStudent.sessionXP = {
+        ...student.sessionXP,
+        [currentSession]: currentSessionXP + amount,
+      };
+      updatedStudent.lifetimeXP = currentLifetimeXP + lifetimeContribution;
+    }
+
     setStudents((prev) =>
-      prev.map((student) => {
-        if (student.id === studentId) {
-          if (isLifetime) {
-            // Direct lifetime award (achievements, bonuses)
-            return {
-              ...student,
-              lifetimeXP: Math.max(0, student.lifetimeXP + amount),
-            };
-          } else {
-            // Session award with partial lifetime contribution
-            const sessionXP = { ...student.sessionXP };
-            sessionXP[currentSession] = Math.max(
-              0,
-              (sessionXP[currentSession] || 0) + amount
-            );
+      prev.map((s) => (s.id === studentId ? updatedStudent : s))
+    );
+  };
 
-            // 30% automatically goes to lifetime XP
-            const lifetimeContribution = Math.floor(amount * 0.3);
-            const newLifetimeXP =
-              student.lifetimeXP + (amount > 0 ? lifetimeContribution : 0);
+  const handleDailyXPAward = (studentId, totalXP, awards, date, notes) => {
+    // 1. Award the XP
+    awardXP(studentId, totalXP, false);
 
-            return {
-              ...student,
-              sessionXP,
-              lifetimeXP: Math.max(0, newLifetimeXP),
-            };
-          }
+    // 2. Update the daily tracking (with duplicate-date protection)
+    setDailyXPTracking((prev) => {
+      const newTracking = { ...prev };
+
+      if (!newTracking[studentId]) newTracking[studentId] = {};
+      if (!newTracking[studentId][currentSession]) {
+        newTracking[studentId][currentSession] = {
+          dates: {},
+          totals: {},
+        };
+      }
+
+      // Record the day's awards
+      newTracking[studentId][currentSession].dates[date] = {
+        awards: awards.map((a) => ({
+          id: a.id,
+          name: a.name,
+          xp: a.xp,
+        })),
+        totalXP,
+        notes,
+        timestamp: new Date().toISOString(),
+      };
+
+      // Increment totals only if this date hasn't already been counted for this award
+      awards.forEach((award) => {
+        const totals = newTracking[studentId][currentSession].totals;
+        if (!totals[award.id]) {
+          totals[award.id] = {
+            count: 0,
+            totalXP: 0,
+            dates: [],
+          };
         }
-        return student;
+
+        if (!totals[award.id].dates.includes(date)) {
+          totals[award.id].count += 1;
+          totals[award.id].totalXP += award.xp;
+          totals[award.id].dates.push(date);
+        }
+      });
+
+      return newTracking;
+    });
+
+    // 🚫 No milestone checking here anymore
+  };
+
+  // // Update the handleDailyXPAward function to check milestones
+  //   const handleDailyXPAward = (studentId, totalXP, awards, date, notes) => {
+  //     // Award the XP (30% goes to lifetime)
+  //     awardXP(studentId, totalXP, false);
+
+  //     // Track the daily awards
+  //     setDailyXPTracking(prev => {
+  //       const newTracking = { ...prev };
+
+  //       // Initialize student tracking if needed
+  //       if (!newTracking[studentId]) {
+  //         newTracking[studentId] = {};
+  //       }
+
+  //       // Initialize session tracking if needed
+  //       if (!newTracking[studentId][currentSession]) {
+  //         newTracking[studentId][currentSession] = {
+  //           dates: {},
+  //           totals: {}
+  //         };
+  //       }
+
+  //       // Record awards for this date
+  //       newTracking[studentId][currentSession].dates[date] = {
+  //         awards: awards.map(a => ({
+  //           id: a.id,
+  //           name: a.name,
+  //           xp: a.xp
+  //         })),
+  //         totalXP,
+  //         notes,
+  //         timestamp: new Date().toISOString()
+  //       };
+
+  //       // Update totals for each award type
+  //       awards.forEach(award => {
+  //         if (!newTracking[studentId][currentSession].totals[award.id]) {
+  //           newTracking[studentId][currentSession].totals[award.id] = {
+  //             count: 0,
+  //             totalXP: 0,
+  //             dates: []
+  //           };
+  //         }
+
+  //         const total = newTracking[studentId][currentSession].totals[award.id];
+
+  //           // ✅ Only increment if this award hasn’t been given for this date yet
+  //   if (!total.dates.includes(date)) {
+  //     total.count += 1;
+  //     total.totalXP += award.xp;
+  //     total.dates.push(date);
+  //   }
+  //       });
+
+  //       return newTracking;
+  //     });
+
+  //     // Check for newly earned milestones
+  //     setTimeout(() => {
+  //       const { sessionMilestones, lifetimeAchievements } = checkAllMilestones(
+  //         studentId,
+  //         currentSession,
+  //         dailyXPTracking,
+  //         students,
+  //         sessions,
+  //         attendance,
+  //         studentMilestones
+  //       );
+
+  //       // Award any newly earned session milestones
+  //       sessionMilestones.forEach(milestone => {
+  //         awardMilestone(studentId, milestone.id);
+  //         console.log(`🎉 ${students.find(s => s.id === studentId).name} earned ${milestone.name}!`);
+  //       });
+
+  //       // Award any newly earned lifetime achievements
+  //       lifetimeAchievements.forEach(achievement => {
+  //         // Create the achievement if it doesn't exist
+  //         let achievementId = achievements.find(a => a.name === achievement.name)?.id;
+
+  //         if (!achievementId) {
+  //           // Add the achievement to the system
+  //           const newAchievement = {
+  //             id: Date.now(),
+  //             name: achievement.name,
+  //             icon: achievement.icon,
+  //             description: achievement.description,
+  //             xp: achievement.xp,
+  //             type: 'lifetime'
+  //           };
+  //           setAchievements(prev => [...prev, newAchievement]);
+  //           achievementId = newAchievement.id;
+  //         }
+
+  //         awardAchievement(studentId, achievementId);
+  //         console.log(`🏆 ${students.find(s => s.id === studentId).name} earned lifetime achievement: ${achievement.name}!`);
+  //       });
+  //     }, 100); // Small delay to ensure state updates
+  //   };
+
+  //   // Add milestone checking function
+  //   const checkForMilestones = (studentId) => {
+  //     const tracking = dailyXPTracking[studentId]?.[currentSession];
+  //     if (!tracking) return;
+
+  //     const student = students.find((s) => s.id === studentId);
+  //     if (!student) return;
+
+  //     // Check Clean Workspace Champion (3+ times)
+  //     if (tracking.totals["clean-workspace"]?.count >= 3) {
+  //       const milestoneId = `cleanup-champion-${currentSession}`;
+  //       if (
+  //         !studentMilestones[studentId]?.[currentSession]?.includes(
+  //           "cleanup-champion"
+  //         )
+  //       ) {
+  //         awardMilestone(studentId, "cleanup-champion");
+  //         console.log(`${student.name} earned Clean-Up Champion!`);
+  //       }
+  //     }
+
+  //     // Check Early Bird (5+ times)
+  //     if (tracking.totals["early-bird"]?.count >= 5) {
+  //       if (
+  //         !studentMilestones[studentId]?.[currentSession]?.includes("earlybird")
+  //       ) {
+  //         awardMilestone(studentId, "earlybird");
+  //         console.log(`${student.name} earned Early Bird milestone!`);
+  //       }
+  //     }
+
+  //     // Check Team Builder (helped 3+ times)
+  //     if (tracking.totals["class-helper"]?.count >= 3) {
+  //       if (!studentMilestones[studentId]?.[currentSession]?.includes("helper")) {
+  //         awardMilestone(studentId, "helper");
+  //         console.log(`${student.name} earned Team Builder milestone!`);
+  //       }
+  //     }
+
+  //     // Check for lifetime achievements based on total sessions
+  //     const totalRobotBuilds = Object.values(
+  //       dailyXPTracking[studentId] || {}
+  //     ).reduce(
+  //       (sum, session) => sum + (session.totals?.["robot-build"]?.count || 0),
+  //       0
+  //     );
+
+  //     if (
+  //       totalRobotBuilds >= 1 &&
+  //       !student.achievements?.includes("first-robot")
+  //     ) {
+  //       // This should trigger the "First Robot" lifetime achievement
+  //       // You'll need to create this achievement ID in your achievements list
+  //       const firstRobotAchievement = achievements.find(
+  //         (a) => a.name === "First Robot"
+  //       );
+  //       if (firstRobotAchievement) {
+  //         awardAchievement(studentId, firstRobotAchievement.id);
+  //       }
+  //     }
+  //   };
+
+  const awardAchievement = (studentId, achievementId) => {
+    console.log(
+      `🎁 awardAchievement called: studentId=${studentId}, achievementId=${achievementId}`
+    );
+
+    const achievement = achievements.find((a) => a.id === achievementId);
+    console.log("🔍 Found achievement:", achievement);
+
+    if (!achievement) {
+      console.log("❌ Achievement not found!");
+      return;
+    }
+
+    setStudents((prevStudents) =>
+      prevStudents.map((student) => {
+        if (student.id !== studentId) return student;
+
+        const currentLifetimeXP = student.lifetimeXP || 0;
+        const currentSessionXP = student.sessionXP?.[currentSession] || 0;
+
+        // 🛑 Lifetime achievement — do not duplicate
+        if (achievement.type === "lifetime") {
+          if (student.achievements?.includes(achievementId)) return student;
+
+          return {
+            ...student,
+            achievements: [...(student.achievements || []), achievementId],
+            lifetimeXP: currentLifetimeXP + achievement.xp,
+          };
+        }
+
+        // 🟢 Session achievement — also check duplication
+        const earnedInSession =
+          student.sessionAchievements?.[currentSession] || [];
+        if (earnedInSession.includes(achievementId)) return student;
+
+        return {
+          ...student,
+          sessionAchievements: {
+            ...student.sessionAchievements,
+            [currentSession]: [...earnedInSession, achievementId],
+          },
+          sessionXP: {
+            ...student.sessionXP,
+            [currentSession]: currentSessionXP + achievement.xp,
+          },
+          lifetimeXP: currentLifetimeXP + Math.floor(achievement.xp * 0.3),
+        };
       })
     );
   };
 
-  // Award achievement - SIMPLE FINAL VERSION
-  const awardAchievement = (studentId, achievementId) => {
-    const achievement = achievements.find((a) => a.id === achievementId);
-    if (!achievement) return;
+  const createAndAwardAchievement = (studentId, achievementData) => {
+    // First, ensure the achievement exists in the system
+    const existingAchievement = achievements.find(
+      (a) => a.name === achievementData.name && a.type === achievementData.type
+    );
 
-    // Check BEFORE state update to show alerts
-    const student = students.find((s) => s.id === studentId);
-    if (!student) return;
+    if (!existingAchievement) {
+      // Add to achievements
+      setAchievements((prev) => [...prev, achievementData]);
 
-    if (
-      achievement.type === "lifetime" &&
-      student.achievements?.includes(achievementId)
-    ) {
-      alert(`${student.name} already earned "${achievement.name}"!`);
-      return;
-    }
+      // Award to student with the achievement data directly
+      setStudents((prevStudents) =>
+        prevStudents.map((student) => {
+          if (student.id !== studentId) return student;
 
-    if (achievement.type === "session") {
-      const currentSessionAchievements =
-        student.sessionAchievements?.[currentSession] || [];
-      if (currentSessionAchievements.includes(achievementId)) {
-        alert(
-          `${student.name} already earned "${achievement.name}" this session!`
-        );
-        return;
-      }
-    }
-
-    // Now do the state update - using functional update to ensure we always get latest state
-    setStudents((prev) => {
-      // Find the most current version of the student
-      const currentStudent = prev.find((s) => s.id === studentId);
-      if (!currentStudent) return prev;
-
-      // Check again with the most current data
-      if (achievement.type === "session") {
-        const currentAchievements =
-          currentStudent.sessionAchievements?.[currentSession] || [];
-        if (currentAchievements.includes(achievementId)) {
-          // Already has it in the current state, no update needed
-          return prev;
-        }
-      }
-
-      // Now we definitely need to add it
-      return prev.map((s) => {
-        if (s.id !== studentId) return s;
-
-        if (achievement.type === "lifetime") {
           return {
-            ...s,
-            achievements: [...(s.achievements || []), achievementId],
-            lifetimeXP: (s.lifetimeXP || 0) + achievement.xp,
+            ...student,
+            achievements: [...(student.achievements || []), achievementData.id],
+            lifetimeXP: (student.lifetimeXP || 0) + achievementData.xp,
           };
-        } else {
-          // Session achievement - do everything in one shot
-          const updatedStudent = {
-            ...s,
-            sessionAchievements: {
-              ...s.sessionAchievements,
-              [currentSession]: [
-                ...(s.sessionAchievements?.[currentSession] || []),
-                achievementId,
-              ],
-            },
-            sessionXP: {
-              ...s.sessionXP,
-              [currentSession]:
-                (s.sessionXP?.[currentSession] || 0) + achievement.xp,
-            },
-            lifetimeXP: (s.lifetimeXP || 0) + Math.floor(achievement.xp * 0.3),
-          };
-
-          return updatedStudent;
-        }
-      });
-    });
+        })
+      );
+    } else {
+      // Use existing awardAchievement function
+      awardAchievement(studentId, existingAchievement.id);
+    }
   };
+
+  // // Award achievement - SIMPLE FINAL VERSION
+  // const awardAchievement = (studentId, achievementId) => {
+  //   const achievement = achievements.find((a) => a.id === achievementId);
+  //   if (!achievement) return;
+
+  //   // Check BEFORE state update to show alerts
+  //   const student = students.find((s) => s.id === studentId);
+  //   if (!student) return;
+
+  //   if (
+  //     achievement.type === "lifetime" &&
+  //     student.achievements?.includes(achievementId)
+  //   ) {
+  //     alert(`${student.name} already earned "${achievement.name}"!`);
+  //     return;
+  //   }
+
+  //   if (achievement.type === "session") {
+  //     const currentSessionAchievements =
+  //       student.sessionAchievements?.[currentSession] || [];
+  //     if (currentSessionAchievements.includes(achievementId)) {
+  //       alert(
+  //         `${student.name} already earned "${achievement.name}" this session!`
+  //       );
+  //       return;
+  //     }
+  //   }
+
+  //   // Now do the state update - using functional update to ensure we always get latest state
+  //   setStudents((prev) => {
+  //     // Find the most current version of the student
+  //     const currentStudent = prev.find((s) => s.id === studentId);
+  //     if (!currentStudent) return prev;
+
+  //     // Check again with the most current data
+  //     if (achievement.type === "session") {
+  //       const currentAchievements =
+  //         currentStudent.sessionAchievements?.[currentSession] || [];
+  //       if (currentAchievements.includes(achievementId)) {
+  //         // Already has it in the current state, no update needed
+  //         return prev;
+  //       }
+  //     }
+
+  //     // Now we definitely need to add it
+  //     return prev.map((s) => {
+  //       if (s.id !== studentId) return s;
+
+  //       if (achievement.type === "lifetime") {
+  //         return {
+  //           ...s,
+  //           achievements: [...(s.achievements || []), achievementId],
+  //           lifetimeXP: (s.lifetimeXP || 0) + achievement.xp,
+  //         };
+  //       } else {
+  //         // Session achievement - do everything in one shot
+  //         const updatedStudent = {
+  //           ...s,
+  //           sessionAchievements: {
+  //             ...s.sessionAchievements,
+  //             [currentSession]: [
+  //               ...(s.sessionAchievements?.[currentSession] || []),
+  //               achievementId,
+  //             ],
+  //           },
+  //           sessionXP: {
+  //             ...s.sessionXP,
+  //             [currentSession]:
+  //               (s.sessionXP?.[currentSession] || 0) + achievement.xp,
+  //           },
+  //           lifetimeXP: (s.lifetimeXP || 0) + Math.floor(achievement.xp * 0.3),
+  //         };
+
+  //         return updatedStudent;
+  //       }
+  //     });
+  //   });
+  // };
 
   // Get how many times an achievement was earned across all sessions
   const getAchievementEarnCount = (student, achievementId) => {
@@ -584,18 +1051,23 @@ const VEXLifetimeAchievementSystem = () => {
 
   // Award session milestone
   const awardMilestone = (studentId, milestoneKey) => {
-    const milestone = sessionMilestones[milestoneKey];
+    // Get milestone from either local or system-defined source
+    const milestone =
+      sessionMilestones[milestoneKey] || SESSION_MILESTONES[milestoneKey];
     if (!milestone) return;
 
-    // Check if already awarded for this session
-    const studentSessionMilestones =
-      studentMilestones[studentId]?.[currentSession] || [];
-    if (studentSessionMilestones.includes(milestoneKey)) return;
+    // Check if already earned
+    const alreadyEarned =
+      studentMilestones[studentId]?.[currentSession]?.includes(milestoneKey);
+    if (alreadyEarned) return;
 
-    // Award lifetime bonus
-    awardXP(studentId, milestone.lifetimeBonus, true);
+    // ✅ Get XP safely from either property
+    const xp = milestone.lifetimeBonus ?? milestone.lifetimeXP ?? 0;
 
-    // Track milestone
+    // ✅ Award XP to lifetime (bulletproof awardXP() assumed)
+    awardXP(studentId, xp, true);
+
+    // ✅ Track the milestone in student history
     setStudentMilestones((prev) => ({
       ...prev,
       [studentId]: {
@@ -5967,23 +6439,39 @@ const VEXLifetimeAchievementSystem = () => {
   };
 
   const updateStudentTournamentHistory = (tournament) => {
+    console.log("🏆 updateStudentTournamentHistory called with:", tournament);
     const updatedStudents = [...students];
     const tournamentTeams = teams.filter((t) =>
       tournament.teams.includes(t.id)
     );
 
+    console.log("👥 Tournament teams:", tournamentTeams);
+
+    const currentSessionObj = sessions.find((s) => s.name === currentSession);
+    const sessionCategory = getSessionCategory(currentSessionObj);
+
+    console.log("📅 Current session:", currentSession);
+    console.log("🏷️ Session category:", sessionCategory);
+
     // Process each student's results
     tournament.results.finalRankings.forEach((ranking) => {
+      console.log("🏅 Processing ranking:", ranking);
+
       const team = tournamentTeams.find((t) => t.id === ranking.teamId);
       if (!team) return;
 
+      console.log("👥 Processing team:", team);
+
       team.studentIds.forEach((studentId) => {
+        console.log(`👤 Processing student: ${studentId}`);
+
         const studentIndex = updatedStudents.findIndex(
           (s) => s.id === studentId
         );
         if (studentIndex === -1) return;
 
         const student = updatedStudents[studentIndex];
+        console.log("📋 Student data:", student);
 
         // Create tournament history entry
         const historyEntry = {
@@ -6083,11 +6571,93 @@ const VEXLifetimeAchievementSystem = () => {
           (a, b) => b.count - a.count
         );
 
+        // NEW: Check for TXR tournament achievements
+        console.log("🎮 Checking for TXR achievements...");
+        const txrAchievements = processTXRTournamentAchievements(
+          tournament,
+          studentId,
+          teams,
+          students
+        );
+
+        console.log("🏆 TXR achievements earned:", txrAchievements);
+
+        // Award each earned TXR achievement
+        txrAchievements.forEach((achievement) => {
+          console.log(`🎯 Awarding ${achievement.name} to ${student.name}`);
+
+          // For TXR achievements, they're session-based
+          const currentSessionAchievements =
+            student.sessionAchievements?.[currentSession] || [];
+
+          // Check if already earned this session
+          const alreadyEarned = currentSessionAchievements.some((achId) => {
+            const ach = achievements.find((a) => a.id === achId);
+            return ach && ach.name === achievement.name;
+          });
+
+          console.log(`Already earned? ${alreadyEarned}`);
+
+          if (!alreadyEarned) {
+            // Create the achievement
+            const newAchievement = {
+              id: `txr-${achievement.id}-${Date.now()}`,
+              name: achievement.name,
+              icon: achievement.icon,
+              description: achievement.description,
+              xp: achievement.xp,
+              type: "session",
+              category: sessionCategory,
+            };
+
+            console.log("Creating new achievement:", newAchievement);
+
+            // Add to achievements array (this will happen after the function completes)
+            setAchievements((prev) => [...prev, newAchievement]);
+
+            // DIRECTLY update the student object we're modifying
+            student.sessionAchievements = {
+              ...student.sessionAchievements,
+              [currentSession]: [
+                ...currentSessionAchievements,
+                newAchievement.id,
+              ],
+            };
+
+            // Add XP directly
+            const currentSessionXP = student.sessionXP?.[currentSession] || 0;
+            student.sessionXP = {
+              ...student.sessionXP,
+              [currentSession]: currentSessionXP + newAchievement.xp,
+            };
+
+            // Add lifetime XP (30% of session XP)
+            student.lifetimeXP =
+              (student.lifetimeXP || 0) + Math.floor(newAchievement.xp * 0.3);
+
+            console.log(
+              `✅ Directly updated ${student.name} with ${newAchievement.name}`
+            );
+            console.log(
+              `   Session XP: ${currentSessionXP} → ${
+                currentSessionXP + newAchievement.xp
+              }`
+            );
+            console.log(
+              `   Lifetime XP: ${
+                student.lifetimeXP - Math.floor(newAchievement.xp * 0.3)
+              } → ${student.lifetimeXP}`
+            );
+          }
+        });
+
+        // Make sure we're updating the student in the array
         updatedStudents[studentIndex] = student;
       });
     });
 
     setStudents(updatedStudents);
+    console.log("✅ updateStudentTournamentHistory complete");
   };
 
   const TournamentDetailsModal = ({ tournament, onClose }) => {
@@ -6414,7 +6984,7 @@ const VEXLifetimeAchievementSystem = () => {
     return (
       <div
         className="bg-white rounded-lg shadow-lg p-6 cursor-pointer hover:shadow-xl transition-shadow"
-        onClick={() => setSelectedStudent(student)}
+        onClick={() => setSelectedStudentId(student.id)}
       >
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
@@ -6491,6 +7061,19 @@ const VEXLifetimeAchievementSystem = () => {
           </div>
         )}
 
+        {/* Badge Count */}
+        <div className="mb-2 text-sm text-gray-600 flex items-center gap-2">
+          <span>🏅 Badges:</span>
+          <span className="font-semibold">
+            {(() => {
+              const sessionBadges =
+                studentMilestones[student.id]?.[currentSession]?.length || 0;
+              const lifetimeBadges = student.achievements?.length || 0;
+              return sessionBadges + lifetimeBadges;
+            })()}
+          </span>
+        </div>
+
         <div className="flex gap-2 flex-wrap">
           {currentSessionAchievements.slice(0, 5).map((achievementId) => {
             const achievement = achievements.find(
@@ -6517,11 +7100,11 @@ const VEXLifetimeAchievementSystem = () => {
     );
   };
 
-  const StudentDetail = () => {
-    if (!selectedStudent) return null;
+  const StudentDetail = ({ studentId, setCurrentViewingStudent, setShowLevelRoadmap }) => {
+    if (!selectedStudentId) return null;
 
     // Always get fresh data from students array
-    const currentStudent = students.find((s) => s.id === selectedStudent.id);
+    const currentStudent = students.find((s) => s.id === selectedStudentId);
     if (!currentStudent) return null;
 
     const [showXPAnimation, setShowXPAnimation] = useState(null);
@@ -6529,6 +7112,10 @@ const VEXLifetimeAchievementSystem = () => {
     const [showAllTournaments, setShowAllTournaments] = useState(false);
 
     const lifetimeLevel = getStudentLevel(currentStudent.lifetimeXP || 0);
+    const nextLevel = levels[lifetimeLevel.level] || levels[levels.length - 1];
+    const xpProgress = lifetimeLevel.level < 15 
+      ? ((currentStudent.lifetimeXP - lifetimeLevel.minXP) / (nextLevel.minXP - lifetimeLevel.minXP)) * 100
+      : 100;
     const sessionXP = getSessionXP(currentStudent);
     const earnedMilestones = getStudentMilestones(currentStudent.id);
 
@@ -6630,7 +7217,7 @@ const VEXLifetimeAchievementSystem = () => {
               </div>
             </div>
             <button
-              onClick={() => setSelectedStudent(null)}
+              onClick={() => setSelectedStudentId(null)}
               className="text-2xl hover:bg-gray-100 rounded p-1"
             >
               ×
@@ -6693,6 +7280,86 @@ const VEXLifetimeAchievementSystem = () => {
               </div>
             )}
           </div>
+
+          {/* Level Progress Section */}
+<div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+  <div className="flex items-center justify-between mb-4">
+    <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+      <Trophy className="w-6 h-6 text-yellow-500" />
+      Level Progress
+    </h3>
+    <button
+      onClick={() => {
+        setCurrentViewingStudent(currentStudent);
+        setShowLevelRoadmap(true);
+      }}
+      className="text-sm text-purple-600 hover:text-purple-700 font-medium"
+    >
+      View Full Roadmap →
+    </button>
+  </div>
+
+  {/* Current Level Badge */}
+  <div className="text-center mb-4">
+    <div className={`inline-flex items-center px-4 py-2 rounded-lg font-bold text-lg ${
+      lifetimeLevel.level >= 14 
+        ? 'bg-gradient-to-r from-red-500 via-yellow-500 to-blue-500 text-white' 
+        : lifetimeLevel.level >= 11 
+        ? 'bg-yellow-400 text-yellow-900 ring-2 ring-yellow-500'
+        : `${lifetimeLevel.color} text-white`
+    }`}>
+      Level {lifetimeLevel.level}: {lifetimeLevel.name}
+    </div>
+  </div>
+
+  {/* XP Display */}
+  <div className="flex justify-between items-center mb-2">
+    <span className="text-sm text-gray-600">Lifetime XP</span>
+    <span className="text-xl font-bold text-orange-600">{currentStudent.lifetimeXP.toLocaleString()}</span>
+  </div>
+
+  <div className="relative">
+  {/* Progress bar labels */}
+  <div className="flex justify-between text-sm text-gray-500 mb-2">
+    <span>Level {lifetimeLevel.level}: {lifetimeLevel.minXP.toLocaleString()} XP</span>
+    <span>Level {nextLevel.level}: {nextLevel.minXP.toLocaleString()} XP</span>
+  </div>
+  
+  {/* Progress bar */}
+  <div className="w-full bg-gray-200 rounded-full h-3 mb-1">
+    <div
+      className="h-full bg-gradient-to-r from-orange-400 to-orange-600 rounded-full transition-all duration-500"
+      style={{ width: `${xpProgress}%` }}
+    />
+  </div>
+  
+  {/* Current XP indicator below */}
+  <div className="relative h-6">
+    <div 
+      className="absolute transform -translate-x-1/2 transition-all duration-500"
+      style={{ left: `${Math.min(Math.max(xpProgress, 10), 90)}%` }}
+    >
+      <div className="text-xs font-semibold text-gray-700 whitespace-nowrap">
+        <div className="w-0.5 h-2 bg-gray-400 mx-auto mb-0.5"></div>
+        {currentStudent.lifetimeXP.toLocaleString()} XP
+      </div>
+    </div>
+  </div>
+  
+  {/* Progress summary */}
+  <p className="text-center text-sm text-gray-600 mt-2">
+    {Math.round(xpProgress)}% complete • {(nextLevel.minXP - currentStudent.lifetimeXP).toLocaleString()} XP to Level {nextLevel.level}
+  </p>
+</div>
+
+  {/* Max Level Celebration */}
+  {lifetimeLevel.level === 15 && (
+    <div className="text-center mt-4 p-4 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg">
+      <p className="font-bold text-lg text-gray-800">🎉 Maximum Level Achieved!</p>
+      <p className="text-sm text-gray-600">TXR Immortal - The Ultimate Achievement!</p>
+    </div>
+  )}
+</div>
 
           {/* Tournament History Section */}
           {studentTournamentHistory.length > 0 && (
@@ -6860,195 +7527,511 @@ const VEXLifetimeAchievementSystem = () => {
             </div>
           )}
 
-          {/* Session Completion Bonuses */}
-          <div className="mb-6 p-4 bg-yellow-50 rounded-lg">
-            <h3 className="font-bold mb-3 flex items-center gap-2">
-              🎯 Session Completion Bonuses
-            </h3>
-            <div className="grid grid-cols-2 gap-2">
-              {Object.entries(sessionMilestones).map(([key, milestone]) => {
-                const isEarned = earnedMilestones.includes(key);
-                return (
-                  <div
-                    key={key}
-                    className={`p-3 rounded-lg border ${
-                      isEarned
-                        ? "bg-green-100 border-green-300"
-                        : "bg-white border-gray-200 cursor-pointer hover:bg-gray-50"
-                    }`}
-                    onClick={() =>
-                      !isEarned && awardMilestone(currentStudent.id, key)
-                    }
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-2xl">{milestone.icon}</span>
-                      <div className="flex-1">
-                        <div className="font-semibold text-sm">
-                          {milestone.name}
-                        </div>
-                        <div className="text-xs text-gray-600">
-                          {milestone.requirement}
-                        </div>
-                        <div
-                          className={`text-xs font-bold ${
-                            isEarned ? "text-green-600" : "text-blue-600"
-                          }`}
-                        >
-                          {isEarned
-                            ? "✓ Earned"
-                            : `+${milestone.lifetimeBonus} Lifetime XP`}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+          {/* Milestone Progress Display */}
+          <div className="mb-6">
+            {(() => {
+              const { sessionProgress, lifetimeProgress } =
+                getMilestoneProgress(
+                  currentStudent.id,
+                  currentSession,
+                  dailyXPTracking,
+                  students,
+                  sessions,
+                  attendance,
+                  studentMilestones,
+                  achievements
                 );
-              })}
+
+              const handleAwardMilestone = (milestone) => {
+                // Award the milestone bonus XP (this is lifetime XP)
+                //awardXP(currentStudent.id, milestone.lifetimeXP, true); // true = lifetime XP
+
+                // Track the milestone as earned
+                awardMilestone(currentStudent.id, milestone.id);
+
+                // Show success animation
+                setShowXPAnimation({
+                  session: 0,
+                  lifetime: milestone.lifetimeXP,
+                });
+                setTimeout(() => setShowXPAnimation(null), 2000);
+              };
+
+              const handleAwardAchievement = (achievement) => {
+                // First, check if the achievement already exists in the system
+                let existingAchievement = achievements.find(
+                  (a) => a.name === achievement.name && a.type === "lifetime"
+                );
+
+                if (!existingAchievement) {
+                  // Create the achievement if it doesn't exist
+                  const newAchievement = {
+                    id: Date.now(),
+                    name: achievement.name,
+                    icon: achievement.icon,
+                    description: achievement.description,
+                    xp: achievement.xp,
+                    type: "lifetime",
+                  };
+
+                  // Add to achievements list
+                  setAchievements((prev) => [...prev, newAchievement]);
+                  existingAchievement = newAchievement;
+
+                  // Small delay to ensure state updates
+                  setTimeout(() => {
+                    awardAchievement(currentStudent.id, newAchievement.id);
+                  }, 100);
+                } else {
+                  // Award the existing achievement
+                  awardAchievement(currentStudent.id, existingAchievement.id);
+                }
+
+                // Show success animation
+                setShowXPAnimation({
+                  session: 0,
+                  lifetime: achievement.xp,
+                });
+                setTimeout(() => setShowXPAnimation(null), 2000);
+              };
+
+              // const handleAwardAchievement = (achievement) => {
+              //   // Find or create the achievement
+              //   let achievementId = achievements.find(a => a.name === achievement.name)?.id;
+
+              //   if (!achievementId) {
+              //     // Add the achievement to the system
+              //     const newAchievement = {
+              //       id: Date.now(),
+              //       name: achievement.name,
+              //       icon: achievement.icon,
+              //       description: achievement.description,
+              //       xp: achievement.xp,
+              //       type: 'lifetime'
+              //     };
+              //     setAchievements(prev => [...prev, newAchievement]);
+              //     achievementId = newAchievement.id;
+              //   }
+
+              //   // Award the achievement (this already includes XP)
+              //   awardAchievement(currentStudent.id, achievementId);
+
+              //   // Force refresh the current student data
+              //   setSelectedStudent(students.find(s => s.id === currentStudent.id));
+
+              //   // Show success animation
+              //   setShowXPAnimation({
+              //     session: 0,
+              //     lifetime: achievement.xp
+              //   });
+              //   setTimeout(() => setShowXPAnimation(null), 2000);
+              // };
+
+              return (
+                <MilestoneProgressDisplay
+                  sessionProgress={sessionProgress}
+                  lifetimeProgress={lifetimeProgress}
+                  onAwardMilestone={handleAwardMilestone}
+                  onAwardAchievement={handleAwardAchievement}
+                  studentName={currentStudent.name}
+                />
+              );
+            })()}
+          </div>
+
+          {/* Badge Preview */}
+          <div className="mb-6">
+            <h3 className="font-bold text-lg mb-3 flex items-center justify-between">
+              <span>🏅 Badge Collection</span>
+              <button
+                onClick={() => setShowBadgeGallery(true)}
+                className="text-sm text-blue-600 hover:text-blue-800 font-normal"
+              >
+                View All Badges →
+              </button>
+            </h3>
+
+            {/* Show a preview of earned badges */}
+            <div className="flex gap-2 flex-wrap">
+              {(() => {
+                const allEarnedBadges = [];
+
+                // Add lifetime achievement badges with XP values
+                currentStudent.achievements?.forEach((achievementId) => {
+                  const ach = achievements.find((a) => a.id === achievementId);
+                  if (ach) {
+                    const badgeIcon = {
+                      // Lifetime Achievements
+                      "First Robot": {
+                        icon: "🤖",
+                        name: "First Robot",
+                        xp: 50,
+                      },
+                      "First Program": {
+                        icon: "💻",
+                        name: "First Program",
+                        xp: 50,
+                      },
+                      "First Engineering Notebook": {
+                        icon: "📓",
+                        name: "First Notebook",
+                        xp: 50,
+                      },
+                      "TXR Achiever": {
+                        icon: "🔰",
+                        name: "TXR Achiever",
+                        xp: 100,
+                      },
+                      "TXR Veteran": {
+                        icon: "🛠️",
+                        name: "TXR Veteran",
+                        xp: 200,
+                      },
+                      "Attendance Champion": {
+                        icon: "🏅",
+                        name: "Attendance Champion",
+                        xp: 150,
+                      },
+
+                      // Competition Honors - Major Awards
+                      "Tournament Champion": {
+                        icon: "🏆",
+                        name: "Tournament Champion",
+                        xp: 350,
+                      },
+                      "Robot Skills Champion": {
+                        icon: "🎮",
+                        name: "Robot Skills Champion",
+                        xp: 350,
+                      },
+                      "Excellence Award": {
+                        icon: "👑",
+                        name: "Excellence Award",
+                        xp: 500,
+                      },
+                      "Double Crown": {
+                        icon: "🏵️",
+                        name: "Double Crown",
+                        xp: 750,
+                      },
+                      "Triple Crown": {
+                        icon: "💎",
+                        name: "Triple Crown",
+                        xp: 1000,
+                      },
+
+                      // Competition Honors - Judged Awards
+                      "Design Award": {
+                        icon: "📐",
+                        name: "Design Award",
+                        xp: 200,
+                      },
+                      "Think Award": {
+                        icon: "🧠",
+                        name: "Think Award",
+                        xp: 200,
+                      },
+                      "Innovate Award": {
+                        icon: "💡",
+                        name: "Innovate Award",
+                        xp: 200,
+                      },
+                      "Build Award": {
+                        icon: "🔨",
+                        name: "Build Award",
+                        xp: 200,
+                      },
+                      "Create Award": {
+                        icon: "🎨",
+                        name: "Create Award",
+                        xp: 200,
+                      },
+                      "Amaze Award": {
+                        icon: "✨",
+                        name: "Amaze Award",
+                        xp: 200,
+                      },
+                      "Inspire Award": {
+                        icon: "🌟",
+                        name: "Inspire Award",
+                        xp: 200,
+                      },
+                      "Sportsmanship Award": {
+                        icon: "🤝",
+                        name: "Sportsmanship Award",
+                        xp: 200,
+                      },
+                      "Judges' Award": {
+                        icon: "⭐",
+                        name: "Judges' Award",
+                        xp: 200,
+                      },
+                      "Tournament Competitor": {
+                        icon: "🚩",
+                        name: "Tournament Competitor",
+                        xp: 50,
+                      },
+
+                      // Annual Awards
+                      "Robotics Student of the Year": {
+                        icon: "🏅",
+                        name: "Student of the Year",
+                        xp: 500,
+                      },
+                      "Leadership Excellence": {
+                        icon: "🌟",
+                        name: "Leadership Excellence",
+                        xp: 300,
+                      },
+                      "Competitive Spirit": {
+                        icon: "💪",
+                        name: "Competitive Spirit",
+                        xp: 200,
+                      },
+                      "Program Ambassador": {
+                        icon: "🗣️",
+                        name: "Program Ambassador",
+                        xp: 250,
+                      },
+
+                      // Multi-Year Recognition
+                      "Returner Award": {
+                        icon: "🔁",
+                        name: "Returner Award",
+                        xp: 100,
+                      },
+                      "Loyalty Award": {
+                        icon: "💎",
+                        name: "Loyalty Award",
+                        xp: 200,
+                      },
+                      "Dedication Medal": {
+                        icon: "🎖️",
+                        name: "Dedication Medal",
+                        xp: 300,
+                      },
+                      "Legacy Honor": {
+                        icon: "🏛️",
+                        name: "Legacy Honor",
+                        xp: 500,
+                      },
+                    };
+
+                    const badge = badgeIcon[ach.name];
+                    if (badge) {
+                      allEarnedBadges.push({ ...badge, priority: badge.xp });
+                    }
+                  }
+                });
+
+                // Add TXR tournament achievements (session achievements)
+                const sessionAchievements =
+                  currentStudent.sessionAchievements?.[currentSession] || [];
+                sessionAchievements.forEach((achievementId) => {
+                  const ach = achievements.find((a) => a.id === achievementId);
+                  if (ach) {
+                    const txrBadgeIcons = {
+                      "TXR Tournament Participant": {
+                        icon: "🎯",
+                        name: "TXR Participant",
+                        priority: 25,
+                      },
+                      "TXR Teamwork Champion": {
+                        icon: "🤝",
+                        name: "TXR Teamwork Champion",
+                        priority: 50,
+                      },
+                      "TXR Skills Champion": {
+                        icon: "🎮",
+                        name: "TXR Skills Champion",
+                        priority: 50,
+                      },
+                      "TXR Podium Finish": {
+                        icon: "🏅",
+                        name: "TXR Podium Finish",
+                        priority: 35,
+                      },
+                      "TXR Perfect Score": {
+                        icon: "💯",
+                        name: "TXR Perfect Score",
+                        priority: 40,
+                      },
+                    };
+
+                    const badge = txrBadgeIcons[ach.name];
+                    if (badge) {
+                      allEarnedBadges.push({ ...badge });
+                    }
+                  }
+                });
+
+                // Add session milestone badges with lower priority
+                const sessionMilestones =
+                  studentMilestones[currentStudent.id]?.[currentSession] || [];
+                const sessionXP =
+                  currentStudent.sessionXP?.[currentSession] || 0;
+                if (sessionXP >= 100) {
+                  allEarnedBadges.push({
+                    icon: "🔥",
+                    name: "Session Champion",
+                    priority: 60,
+                  });
+                }
+                const sessionBadgeIcons = {
+                  "perfect-attendance": {
+                    icon: "📅",
+                    name: "Perfect Attendance",
+                    priority: 25,
+                  },
+                  "early-bird": {
+                    icon: "🐦",
+                    name: "Early Bird",
+                    priority: 25,
+                  },
+                  "cleanup-champion": {
+                    icon: "🧹",
+                    name: "Clean-Up Champion",
+                    priority: 25,
+                  },
+                  "documentation-expert": {
+                    icon: "📓",
+                    name: "Documentation Expert",
+                    priority: 25,
+                  },
+                  "session-complete": {
+                    icon: "✅",
+                    name: "Session Complete",
+                    priority: 40,
+                  },
+                  "ultimate-collaborator": {
+                    icon: "🤝",
+                    name: "Ultimate Collaborator",
+                    priority: 50,
+                  },
+                };
+
+                sessionMilestones.forEach((milestone) => {
+                  if (sessionBadgeIcons[milestone]) {
+                    allEarnedBadges.push(sessionBadgeIcons[milestone]);
+                  }
+                });
+
+                // Sort by priority (XP value) descending
+                allEarnedBadges.sort((a, b) => b.priority - a.priority);
+
+                // Show top 8 badges
+                return allEarnedBadges.slice(0, 8).map((badge, idx) => (
+                  <div
+                    key={idx}
+                    className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center ring-2 ring-blue-400"
+                    title={`${badge.name} (${badge.priority} XP)`}
+                  >
+                    <span className="text-xl">{badge.icon}</span>
+                  </div>
+                ));
+              })()}
+
+              {/* Show more indicator */}
+              {(() => {
+                const totalBadges =
+                  (studentMilestones[currentStudent.id]?.[currentSession]
+                    ?.length || 0) + (currentStudent.achievements?.length || 0);
+
+                if (totalBadges > 8) {
+                  return (
+                    <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center ring-2 ring-gray-400">
+                      <span className="text-sm font-bold text-gray-600">
+                        +{totalBadges - 8}
+                      </span>
+                    </div>
+                  );
+                }
+              })()}
             </div>
           </div>
 
-          {/* Lifetime Achievements */}
-          {lifetimeAchievements.length > 0 && (
-            <div className="mb-6">
-              <h3 className="font-bold mb-3">
-                🏆 Earned Lifetime Achievements
-              </h3>
-              <div className="grid grid-cols-2 gap-2">
-                {lifetimeAchievements.map((achievement) => (
-                  <div
-                    key={achievement.id}
-                    className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg"
-                  >
-                    <span className="text-2xl">{achievement.icon}</span>
-                    <div>
-                      <div className="font-semibold text-sm">
-                        {achievement.name}
-                      </div>
-                      <div className="text-xs text-gray-600">
-                        {achievement.xp} XP
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Current Session Achievements - Simplified Single Section */}
-          <div className="mb-6">
-            <h3 className="font-bold mb-3">🎯 Current Session Achievements</h3>
-            <div className="grid grid-cols-2 gap-2">
-              {achievements
-                .filter(
-                  (a) =>
-                    a.type === "session" &&
-                    getSessionCategory(getCurrentSessionObject()) === a.category
-                )
-                .map((achievement) => {
-                  const currentSessionAchievements =
-                    currentStudent.sessionAchievements?.[currentSession] || [];
-                  const isEarned = currentSessionAchievements.includes(
-                    achievement.id
-                  );
-                  const totalEarnCount = getAchievementEarnCount(
-                    currentStudent,
-                    achievement.id
+          {/* Manual Milestone Check */}
+          <div className="mb-6 p-4 bg-yellow-50 rounded-lg">
+            <h3 className="font-bold mb-3">🔄 Check for Earned Milestones</h3>
+            <p className="text-sm text-gray-600 mb-3">
+              Milestones are automatically checked when awarding daily XP. Click
+              below to manually check for any missed milestones.
+            </p>
+            <button
+              onClick={() => {
+                const { sessionMilestones, lifetimeAchievements } =
+                  checkAllMilestones(
+                    currentStudent.id,
+                    currentSession,
+                    dailyXPTracking,
+                    students,
+                    sessions,
+                    attendance,
+                    studentMilestones
                   );
 
-                  return (
-                    <div
-                      key={achievement.id}
-                      className={`p-3 rounded-lg border ${
-                        isEarned
-                          ? "bg-green-100 border-green-300"
-                          : "bg-white border-gray-200 cursor-pointer hover:bg-gray-50"
-                      }`}
-                      onClick={() => {
-                        if (!isEarned) {
-                          handleAchievementAward(achievement.id);
-                        }
-                      }}
-                    >
-                      <div className="flex items-center gap-3">
-                        <span
-                          className={`text-2xl ${
-                            isEarned ? "" : "grayscale opacity-50"
-                          }`}
-                        >
-                          {achievement.icon}
-                        </span>
-                        <div className="flex-1">
-                          <div className="font-semibold">
-                            {achievement.name}
-                          </div>
-                          <div className="text-sm text-gray-600">
-                            {achievement.description}
-                          </div>
-                          <div className="text-xs text-gray-500 mt-1">
-                            {achievement.xp} XP •
-                            {totalEarnCount > 0
-                              ? ` Earned ${totalEarnCount} time${
-                                  totalEarnCount !== 1 ? "s" : ""
-                                }`
-                              : " Not yet earned"}
-                            {isEarned && (
-                              <span className="text-green-600 ml-2">
-                                • ✓ Earned this session!
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        {isEarned && (
-                          <div className="px-3 py-1 bg-green-500 text-white rounded text-sm">
-                            ✓ Earned
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
+                if (
+                  sessionMilestones.length === 0 &&
+                  lifetimeAchievements.length === 0
+                ) {
+                  alert("No new milestones earned yet. Keep working!");
+                } else {
+                  // Award the milestones
+                  sessionMilestones.forEach((milestone) => {
+                    awardMilestone(currentStudent.id, milestone.id);
+                  });
 
-            {/* Available Lifetime Achievements */}
-            {achievements.filter(
-              (a) =>
-                a.type === "lifetime" &&
-                !(currentStudent.achievements || []).includes(a.id)
-            ).length > 0 && (
-              <div className="mt-4">
-                <h4 className="text-sm font-semibold text-gray-600 mb-2">
-                  Available Lifetime Achievements
-                </h4>
-                <div className="grid grid-cols-2 gap-2">
-                  {achievements
-                    .filter(
-                      (a) =>
-                        a.type === "lifetime" &&
-                        !(currentStudent.achievements || []).includes(a.id)
-                    )
-                    .map((achievement) => (
-                      <div
-                        key={achievement.id}
-                        className="flex items-center gap-2 p-2 bg-gray-50 rounded cursor-pointer hover:bg-gray-100"
-                        onClick={() => handleAchievementAward(achievement.id)}
-                      >
-                        <span className="text-xl grayscale opacity-50">
-                          {achievement.icon}
-                        </span>
-                        <div className="text-sm">
-                          <div className="font-semibold">
-                            {achievement.name}
-                          </div>
-                          <div className="text-gray-500">
-                            Click to award • {achievement.xp} XP
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            )}
+                  lifetimeAchievements.forEach((achievement) => {
+                    let achievementId = achievements.find(
+                      (a) => a.name === achievement.name
+                    )?.id;
+                    if (achievementId) {
+                      awardAchievement(currentStudent.id, achievementId);
+                    }
+                  });
+
+                  alert(
+                    `Awarded ${
+                      sessionMilestones.length + lifetimeAchievements.length
+                    } new milestones!`
+                  );
+                }
+              }}
+              className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600"
+            >
+              Check for Milestones
+            </button>
           </div>
         </div>
+        {/* Badge Gallery Modal - Add it HERE, before the closing parenthesis */}
+        {showBadgeGallery && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+              <div className="flex justify-between items-center p-6 border-b">
+                <h2 className="text-2xl font-bold">Badge Gallery</h2>
+                <button
+                  onClick={() => setShowBadgeGallery(false)}
+                  className="text-2xl hover:text-gray-600"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto">
+                <StudentBadgeView
+                  student={currentStudent}
+                  currentSession={currentSession}
+                  dailyXPTracking={dailyXPTracking}
+                  sessions={sessions}
+                  attendance={attendance}
+                  studentMilestones={studentMilestones}
+                  achievements={achievements}
+                  teams={teams}
+                  tournaments={tournaments}
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -7103,6 +8086,10 @@ const VEXLifetimeAchievementSystem = () => {
     <div className="min-h-screen bg-gray-100">
       <NavigationBar
         // View state
+        onRoadmapClick={() => {
+          setCurrentViewingStudent(null);  // No specific student
+          setShowLevelRoadmap(true);
+        }}
         currentView={currentView}
         setCurrentView={setCurrentView}
         currentSession={currentSession}
@@ -7112,7 +8099,7 @@ const VEXLifetimeAchievementSystem = () => {
         tournaments={tournaments}
         userRole={userRole} // or "admin" - we'll make this dynamic later
         // Session Tasks
-        setShowBulkAward={setShowBulkAward}
+        setShowUnifiedXPAward={setShowUnifiedXPAward}
         setShowAttendanceManager={setShowAttendanceManager}
         setShowTeamManager={setShowTeamManager}
         setShowMatchEntry={setShowMatchEntry}
@@ -7131,6 +8118,8 @@ const VEXLifetimeAchievementSystem = () => {
         setShowStudentManager={setShowStudentManager}
         setShowAchievementManager={setShowAchievementManager}
         setShowSettings={setShowSettings}
+        setShowCompetitionHonors={setShowCompetitionHonors}
+        setShowAnnualAwards={setShowAnnualAwards}
       />
       <div className="max-w-7xl mx-auto p-6">
         {currentView === "dashboard" ? (
@@ -7370,12 +8359,29 @@ const VEXLifetimeAchievementSystem = () => {
           </div>
         )}
       </div>
-      {selectedStudent && <StudentDetail />}
+      {selectedStudentId && 
+        <StudentDetail 
+          studentId={selectedStudentId} 
+          setCurrentViewingStudent={setCurrentViewingStudent}
+          setShowLevelRoadmap={setShowLevelRoadmap}
+        />
+      }
       {showSessionManager && <SessionManager />}
       {showAttendanceManager && <AttendanceManager />}
       {showStudentManager && <StudentManager />}
       {showAchievementManager && <AchievementManager />}
-      {showBulkAward && <BulkAchievementAward />}
+      {showUnifiedXPAward && (
+        <UnifiedXPAwardModal
+          students={students}
+          currentSession={currentSession}
+          sessions={sessions}
+          achievements={achievements}
+          onClose={() => setShowUnifiedXPAward(false)}
+          onAwardXP={handleDailyXPAward}
+          onAwardAchievement={awardAchievement}
+          attendance={attendance}
+        />
+      )}
       {showTeamManager && (
         <TeamManager
           students={students}
@@ -7418,6 +8424,17 @@ const VEXLifetimeAchievementSystem = () => {
           onClose={() => setShowAttendanceReport(false)}
         />
       )}
+{showLevelRoadmap && (
+  <LevelRoadmap 
+    currentXP={currentViewingStudent?.lifetimeXP || 0}
+    studentName={currentViewingStudent?.name}
+    animateView={!currentViewingStudent}  // Animate when no specific student
+    onClose={() => {
+      setShowLevelRoadmap(false);
+      setCurrentViewingStudent(null);
+    }} 
+  />
+)}
       {showTournamentWizard && <TournamentWizard />}
       {showTournamentDashboard && <TournamentDashboard />}
       {showTournamentHistory && (
@@ -7438,6 +8455,23 @@ const VEXLifetimeAchievementSystem = () => {
         />
       )}
       {showSettings && <SettingsModal />}
+      {showCompetitionHonors && (
+        <CompetitionHonorsModal
+          students={students}
+          currentSession={currentSession}
+          achievements={achievements}
+          onClose={() => setShowCompetitionHonors(false)}
+          onAwardAchievement={createAndAwardAchievement}
+        />
+      )}
+      {showAnnualAwards && (
+        <AnnualAwardsModal
+          students={students}
+          currentSession={currentSession}
+          onClose={() => setShowAnnualAwards(false)}
+          onAwardAchievement={createAndAwardAchievement}
+        />
+      )}
     </div>
   );
 };
