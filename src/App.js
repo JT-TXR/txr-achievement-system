@@ -6,7 +6,23 @@ import {
   subscribeToStudents,
   dbStudentToApp,
 } from "./lib/studentOperations";
+import {
+  addStudent as addStudentToSupabase,
+  updateStudent as updateStudentInSupabase,
+  deleteStudent as deleteStudentFromSupabase,
+} from "./lib/studentOperations";
 import { migrateStudentsToSupabase } from "./utils/migrateToSupabase";
+import {
+  fetchSessions,
+  subscribeToSessions,
+  dbSessionToApp,
+} from "./lib/sessionOperations";
+import {
+  addSession as addSessionToSupabase,
+  updateSession as updateSessionInSupabase,
+  deleteSession as deleteSessionFromSupabase,
+} from "./lib/sessionOperations";
+import { migrateSessionsToSupabase } from "./utils/migrateSessionsToSupabase";
 
 import { User, Calendar, Award, Trophy } from "lucide-react";
 import { initializeTestData } from "./testData";
@@ -100,6 +116,145 @@ const VEXLifetimeAchievementSystem = () => {
       console.error("Error loading students:", error);
     }
   };
+
+  useEffect(() => {
+    // Only load sessions after auth is ready and we have a user session
+    if (session && !authLoading) {
+      // Add a small delay to ensure localStorage is populated
+      setTimeout(() => {
+        loadSessionsFromSupabase();
+      }, 500);
+    }
+  }, [session, authLoading]);
+
+  // Add this temporarily to see the state of localStorage
+  const debugLocalStorage = () => {
+    console.log("=== localStorage Debug ===");
+    const keys = Object.keys(localStorage).filter((key) => key.includes("vex"));
+
+    keys.forEach((key) => {
+      const value = localStorage.getItem(key);
+      console.log(`${key}:`, value ? `${value.substring(0, 100)}...` : "null");
+    });
+
+    // Specifically check sessions
+    const sessions = localStorage.getItem("vexSessions");
+    if (sessions) {
+      const parsed = JSON.parse(sessions);
+      console.log("Sessions found:", parsed.length, "sessions");
+      parsed.forEach((s) => console.log(`- ${s.name}`));
+    } else {
+      console.log("No sessions in localStorage");
+    }
+  };
+
+  const loadSessionsFromSupabase = async () => {
+    try {
+      console.log("=== Loading sessions from Supabase ===");
+
+      // First, ensure we have sessions in localStorage
+      let localSessions = JSON.parse(
+        localStorage.getItem("vexSessions") || "[]"
+      );
+      console.log(`Found ${localSessions.length} sessions in localStorage`);
+
+      // If no sessions in localStorage, check if they're in state (from testData)
+      if (localSessions.length === 0 && sessions.length > 0) {
+        console.log("Using sessions from state instead");
+        localSessions = sessions;
+        // Save them to localStorage for migration
+        localStorage.setItem("vexSessions", JSON.stringify(sessions));
+      }
+
+      // Check if we need to migrate
+      const migrated = localStorage.getItem("vexSessions_migrated");
+
+      if (!migrated && localSessions.length > 0) {
+        console.log(
+          `Migrating ${localSessions.length} sessions to Supabase...`
+        );
+        const result = await migrateSessionsToSupabase();
+
+        if (result.success) {
+          console.log(result.message);
+          alert(`Success! Migrated ${result.migrated} sessions to the cloud.`);
+        } else {
+          console.error("Migration failed:", result.error);
+          alert("Session migration failed: " + result.error);
+          return;
+        }
+      } else if (migrated) {
+        console.log("Sessions already migrated");
+      } else {
+        console.log("No sessions to migrate");
+      }
+
+      // Fetch sessions from Supabase
+      const dbSessions = await fetchSessions();
+      console.log(`Loaded ${dbSessions.length} sessions from Supabase`);
+
+      // Convert to app format
+      const appSessions = dbSessions.map(dbSessionToApp);
+      setSessions(appSessions);
+
+      // Set current session if not set
+      if (!currentSession && appSessions.length > 0) {
+        const activeSession =
+          appSessions.find((s) => s.isActive) || appSessions[0];
+        setCurrentSession(activeSession.name);
+        localStorage.setItem("vexCurrentSession", activeSession.name);
+      }
+
+      // Subscribe to real-time changes
+      const subscription = subscribeToSessions((payload) => {
+        console.log("Session change:", payload.eventType);
+
+        if (payload.eventType === "INSERT") {
+          setSessions((prev) => [...prev, dbSessionToApp(payload.new)]);
+        } else if (payload.eventType === "UPDATE") {
+          setSessions((prev) =>
+            prev.map((s) =>
+              s.id === payload.new.id ? dbSessionToApp(payload.new) : s
+            )
+          );
+        } else if (payload.eventType === "DELETE") {
+          setSessions((prev) => prev.filter((s) => s.id !== payload.old.id));
+        }
+      });
+
+      // Return cleanup function
+      return () => {
+        subscription.unsubscribe();
+      };
+    } catch (error) {
+      console.error("Error loading sessions:", error);
+      alert("Failed to load sessions: " + error.message);
+    }
+  };
+
+  const ManualSessionMigration = () => (
+    <div className="p-4 bg-yellow-50 border border-yellow-200 rounded">
+      <h4 className="font-semibold mb-2">Session Migration</h4>
+      <div className="space-y-2">
+        <button
+          onClick={debugLocalStorage}
+          className="px-3 py-1 bg-gray-500 text-white rounded text-sm hover:bg-gray-600 mr-2"
+        >
+          Debug localStorage
+        </button>
+        <button
+          onClick={() => {
+            localStorage.removeItem("vexSessions_migrated");
+            loadSessionsFromSupabase();
+          }}
+          className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
+        >
+          Force Session Migration
+        </button>
+      </div>
+    </div>
+  );
+
   const DebugPanel = () => {
     const [debugInfo, setDebugInfo] = useState({
       localStudents: 0,
@@ -620,8 +775,18 @@ const VEXLifetimeAchievementSystem = () => {
 
   // Load data on mount
   useEffect(() => {
+    console.log("=== App Initialization ===");
+
     const migrated = localStorage.getItem("vexStudents_migrated");
     const existingStudents = localStorage.getItem("vexLifetimeStudents");
+    const existingSessions = localStorage.getItem("vexSessions");
+
+    console.log(
+      "Migration status:",
+      migrated ? "Already migrated" : "Not migrated"
+    );
+    console.log("Existing students:", existingStudents ? "Found" : "None");
+    console.log("Existing sessions:", existingSessions ? "Found" : "None");
 
     if (!migrated && !existingStudents) {
       console.log("Initializing test data for first time...");
@@ -672,31 +837,34 @@ const VEXLifetimeAchievementSystem = () => {
 
   // Validate current session
   useEffect(() => {
-    if (
-      sessions.length > 0 &&
-      !sessions.some((s) => s.name === currentSession)
-    ) {
-      // Current session doesn't exist, switch to first active session
-      const firstActiveSession = sessions.find((s) => s.isActive);
-      if (firstActiveSession) {
-        setCurrentSession(firstActiveSession.name);
+    // Only validate if we have sessions and a currentSession set
+    if (sessions.length > 0 && currentSession) {
+      const sessionExists = sessions.some((s) => s.name === currentSession);
+
+      if (!sessionExists) {
+        console.log("Current session not found, switching to first active");
+        const firstActiveSession = sessions.find((s) => s.isActive);
+        if (firstActiveSession) {
+          setCurrentSession(firstActiveSession.name);
+          localStorage.setItem("vexCurrentSession", firstActiveSession.name);
+        }
       }
     }
-  }, [sessions, currentSession]);
+  }, [sessions]);
 
   // Save data whenever it changes
-  useEffect(() => {
-    localStorage.setItem("vexLifetimeStudents", JSON.stringify(students));
-  }, [students]);
+  // useEffect(() => {
+  //   localStorage.setItem("vexLifetimeStudents", JSON.stringify(students));
+  // }, [students]);
 
   useEffect(() => {
     localStorage.setItem("vexAchievements", JSON.stringify(achievements));
   }, [achievements]);
 
-  useEffect(() => {
-    localStorage.setItem("vexSessions", JSON.stringify(sessions));
-    localStorage.setItem("vexCurrentSession", currentSession);
-  }, [sessions, currentSession]);
+  // useEffect(() => {
+  //   localStorage.setItem("vexSessions", JSON.stringify(sessions));
+  //   localStorage.setItem("vexCurrentSession", currentSession);
+  // }, [sessions, currentSession]);
 
   // Save dailyXPTracking when it changes
   useEffect(() => {
@@ -765,6 +933,10 @@ const VEXLifetimeAchievementSystem = () => {
   useEffect(() => {
     localStorage.setItem("vexTournaments", JSON.stringify(tournaments));
   }, [tournaments]);
+
+  useEffect(() => {
+    validateSessions();
+  }, [sessions]);
 
   // Calculate levels
   const levels = [
@@ -930,7 +1102,7 @@ const VEXLifetimeAchievementSystem = () => {
   };
 
   // Award XP with hybrid system (30% of session XP goes to lifetime)
-  const awardXP = (studentId, amount, isLifetime = false) => {
+  const awardXP = async (studentId, amount, isLifetime = false) => {
     const student = students.find((s) => s.id === studentId);
     if (!student) return;
 
@@ -950,9 +1122,21 @@ const VEXLifetimeAchievementSystem = () => {
       updatedStudent.lifetimeXP = currentLifetimeXP + lifetimeContribution;
     }
 
+    // Update local state immediately for UI responsiveness
     setStudents((prev) =>
       prev.map((s) => (s.id === studentId ? updatedStudent : s))
     );
+
+    // Update in Supabase
+    try {
+      await updateStudentInSupabase(studentId, {
+        lifetimeXP: updatedStudent.lifetimeXP,
+        sessionXP: updatedStudent.sessionXP,
+      });
+    } catch (error) {
+      console.error("Failed to update XP in database:", error);
+      // Optionally revert the local change if database update fails
+    }
   };
 
   const handleDailyXPAward = (studentId, totalXP, awards, date, notes) => {
@@ -1169,7 +1353,7 @@ const VEXLifetimeAchievementSystem = () => {
   //     }
   //   };
 
-  const awardAchievement = (studentId, achievementId) => {
+  const awardAchievement = async (studentId, achievementId) => {
     console.log(
       `🎁 awardAchievement called: studentId=${studentId}, achievementId=${achievementId}`
     );
@@ -1182,43 +1366,59 @@ const VEXLifetimeAchievementSystem = () => {
       return;
     }
 
+    const student = students.find((s) => s.id === studentId);
+    if (!student) return;
+
+    let updatedStudent = { ...student };
+
+    // 🛑 Lifetime achievement — do not duplicate
+    if (achievement.type === "lifetime") {
+      if (student.achievements?.includes(achievementId)) return;
+
+      updatedStudent = {
+        ...student,
+        achievements: [...(student.achievements || []), achievementId],
+        lifetimeXP: (student.lifetimeXP || 0) + achievement.xp,
+      };
+    } else {
+      // 🟢 Session achievement — also check duplication
+      const earnedInSession =
+        student.sessionAchievements?.[currentSession] || [];
+      if (earnedInSession.includes(achievementId)) return;
+
+      updatedStudent = {
+        ...student,
+        sessionAchievements: {
+          ...student.sessionAchievements,
+          [currentSession]: [...earnedInSession, achievementId],
+        },
+        sessionXP: {
+          ...student.sessionXP,
+          [currentSession]:
+            (student.sessionXP?.[currentSession] || 0) + achievement.xp,
+        },
+        lifetimeXP:
+          (student.lifetimeXP || 0) + Math.floor(achievement.xp * 0.3),
+      };
+    }
+
+    // Update local state immediately
     setStudents((prevStudents) =>
-      prevStudents.map((student) => {
-        if (student.id !== studentId) return student;
-
-        const currentLifetimeXP = student.lifetimeXP || 0;
-        const currentSessionXP = student.sessionXP?.[currentSession] || 0;
-
-        // 🛑 Lifetime achievement — do not duplicate
-        if (achievement.type === "lifetime") {
-          if (student.achievements?.includes(achievementId)) return student;
-
-          return {
-            ...student,
-            achievements: [...(student.achievements || []), achievementId],
-            lifetimeXP: currentLifetimeXP + achievement.xp,
-          };
-        }
-
-        // 🟢 Session achievement — also check duplication
-        const earnedInSession =
-          student.sessionAchievements?.[currentSession] || [];
-        if (earnedInSession.includes(achievementId)) return student;
-
-        return {
-          ...student,
-          sessionAchievements: {
-            ...student.sessionAchievements,
-            [currentSession]: [...earnedInSession, achievementId],
-          },
-          sessionXP: {
-            ...student.sessionXP,
-            [currentSession]: currentSessionXP + achievement.xp,
-          },
-          lifetimeXP: currentLifetimeXP + Math.floor(achievement.xp * 0.3),
-        };
-      })
+      prevStudents.map((s) => (s.id === studentId ? updatedStudent : s))
     );
+
+    // Update in Supabase
+    try {
+      await updateStudentInSupabase(studentId, {
+        achievements: updatedStudent.achievements,
+        lifetimeAchievements: updatedStudent.achievements, // Map to correct field name
+        sessionAchievements: updatedStudent.sessionAchievements,
+        lifetimeXP: updatedStudent.lifetimeXP,
+        sessionXP: updatedStudent.sessionXP,
+      });
+    } catch (error) {
+      console.error("Failed to update achievement in database:", error);
+    }
   };
 
   const createAndAwardAchievement = (studentId, achievementData) => {
@@ -1342,24 +1542,20 @@ const VEXLifetimeAchievementSystem = () => {
   };
 
   // Award session milestone
-  const awardMilestone = (studentId, milestoneKey) => {
-    // Get milestone from either local or system-defined source
-    const milestone =
-      sessionMilestones[milestoneKey] || SESSION_MILESTONES[milestoneKey];
+  const awardMilestone = async (studentId, milestoneKey) => {
+    const milestone = sessionMilestones[milestoneKey];
     if (!milestone) return;
 
-    // Check if already earned
     const alreadyEarned =
       studentMilestones[studentId]?.[currentSession]?.includes(milestoneKey);
     if (alreadyEarned) return;
 
-    // ✅ Get XP safely from either property
     const xp = milestone.lifetimeBonus ?? milestone.lifetimeXP ?? 0;
 
-    // ✅ Award XP to lifetime (bulletproof awardXP() assumed)
-    awardXP(studentId, xp, true);
+    // Award XP to lifetime (now async)
+    await awardXP(studentId, xp, true);
 
-    // ✅ Track the milestone in student history
+    // Track the milestone in student history
     setStudentMilestones((prev) => ({
       ...prev,
       [studentId]: {
@@ -1404,6 +1600,27 @@ const VEXLifetimeAchievementSystem = () => {
     linkElement.setAttribute("href", dataUri);
     linkElement.setAttribute("download", exportFileDefaultName);
     linkElement.click();
+  };
+
+  const validateSessions = () => {
+    // Check if Week 5 session exists
+    const hasWeek5 = sessions.some((s) => s.name.includes("Week 5"));
+
+    if (!hasWeek5) {
+      console.warn("Week 5 session is missing from sessions list");
+      // You might want to recreate it or restore from backup
+    }
+
+    // Ensure current session exists
+    const currentSessionExists = sessions.some(
+      (s) => s.name === currentSession
+    );
+    if (!currentSessionExists && sessions.length > 0) {
+      console.warn(
+        `Current session "${currentSession}" not found, switching to first available`
+      );
+      setCurrentSession(sessions[0].name);
+    }
   };
 
   // Add new student
@@ -1520,10 +1737,99 @@ const VEXLifetimeAchievementSystem = () => {
     const [newStudentProgram, setNewStudentProgram] = useState("VEX IQ");
     const [searchFilter, setSearchFilter] = useState("");
 
-    const handleAddStudent = () => {
-      if (newStudentName.trim()) {
-        addStudent(newStudentName.trim(), newStudentProgram);
-        setNewStudentName("");
+    const handleAddStudent = async () => {
+      if (!newStudent.name) {
+        alert("Please enter a student name");
+        return;
+      }
+
+      try {
+        // Prepare the student data
+        const studentData = {
+          name: newStudent.name,
+          email: newStudent.email || null,
+          grade: newStudent.grade || null,
+          lifetimeXP: 0,
+          lifetimeLevel: 1,
+          sessionXP: {},
+          sessionsAttended: [],
+          enrolledSessions:
+            editMode === "enroll" && currentSession ? [currentSession] : [],
+          sessionAchievements: {},
+          lifetimeAchievements: [],
+          avatarStyle: {},
+        };
+
+        // Add to Supabase
+        const addedStudent = await addStudentToSupabase(studentData);
+
+        // The real-time subscription will automatically update the local state
+        // But we can manually update for immediate feedback
+        const formattedStudent = {
+          ...addedStudent,
+          lifetimeXP: addedStudent.lifetime_xp,
+          lifetimeLevel: addedStudent.lifetime_level,
+          sessionXP: addedStudent.session_xp,
+          sessionsAttended: addedStudent.sessions_attended,
+          enrolledSessions: addedStudent.enrolled_sessions,
+          sessionAchievements: addedStudent.session_achievements,
+          lifetimeAchievements: addedStudent.lifetime_achievements,
+          avatarStyle: addedStudent.avatar_style,
+        };
+
+        setStudents((prev) => [...prev, formattedStudent]);
+
+        // Reset form
+        setNewStudent({ name: "", email: "", grade: "" });
+
+        // Show success message
+        alert(`${studentData.name} added successfully!`);
+      } catch (error) {
+        console.error("Error adding student:", error);
+        alert("Failed to add student: " + error.message);
+      }
+    };
+
+    const handleUpdateStudent = async (studentId, updates) => {
+      try {
+        // Update in Supabase
+        await updateStudentInSupabase(studentId, updates);
+
+        // The real-time subscription will handle the state update
+        // But we can update immediately for better UX
+        setStudents((prev) =>
+          prev.map((s) => (s.id === studentId ? { ...s, ...updates } : s))
+        );
+
+        // Close edit modal if you have one
+        setEditingStudent(null);
+      } catch (error) {
+        console.error("Error updating student:", error);
+        alert("Failed to update student: " + error.message);
+      }
+    };
+
+    const handleDeleteStudent = async (studentId, studentName) => {
+      if (
+        !window.confirm(
+          `Are you sure you want to delete ${studentName}? This cannot be undone.`
+        )
+      ) {
+        return;
+      }
+
+      try {
+        // Delete from Supabase
+        await deleteStudentFromSupabase(studentId);
+
+        // The real-time subscription will handle the state update
+        // But we can update immediately for better UX
+        setStudents((prev) => prev.filter((s) => s.id !== studentId));
+
+        alert(`${studentName} has been deleted.`);
+      } catch (error) {
+        console.error("Error deleting student:", error);
+        alert("Failed to delete student: " + error.message);
       }
     };
 
@@ -3142,6 +3448,30 @@ const VEXLifetimeAchievementSystem = () => {
     );
   };
 
+  const restoreMissingSession = () => {
+    const backupSessions = localStorage.getItem("vexSessions_backup");
+    if (backupSessions) {
+      const backup = JSON.parse(backupSessions);
+      const week5Session = backup.find((s) => s.name.includes("Week 5"));
+
+      if (week5Session) {
+        setSessions((prev) => {
+          // Check if it already exists
+          if (prev.some((s) => s.name === week5Session.name)) {
+            return prev;
+          }
+          return [...prev, week5Session];
+        });
+
+        // Save to localStorage
+        const updatedSessions = [...sessions, week5Session];
+        localStorage.setItem("vexSessions", JSON.stringify(updatedSessions));
+
+        alert("Week 5 session restored!");
+      }
+    }
+  };
+
   // Session Manager Modal
   const SessionManager = () => {
     const [newSession, setNewSession] = useState({
@@ -3206,72 +3536,118 @@ const VEXLifetimeAchievementSystem = () => {
       return dates;
     };
 
-    const addSession = () => {
+    const addSession = async () => {
       if (!newSession.name) return;
 
-      const session = {
-        id: `session_${Date.now()}`,
-        name: newSession.name,
-        type: newSession.type,
-        startDate: newSession.startDate
-          ? new Date(newSession.startDate + "T00:00:00").toISOString()
-          : null,
-        endDate: newSession.endDate
-          ? new Date(newSession.endDate + "T00:00:00").toISOString()
-          : null,
-        isActive: true,
-        order: sessions.length,
-        createdAt: new Date().toISOString(),
-        // Scheduling fields
-        scheduleType: newSession.selectedDays.length > 0 ? "weekly" : "custom",
-        selectedDays: newSession.selectedDays,
-        classDates:
-          newSession.selectedDays.length > 0
-            ? generateClassDates(
-                newSession.startDate,
-                newSession.endDate,
-                newSession.selectedDays
-              )
-            : [],
-      };
+      try {
+        const sessionData = {
+          name: newSession.name,
+          type: newSession.type,
+          start_date: newSession.startDate || null,
+          end_date: newSession.endDate || null,
+          is_active: true,
+          order_index: sessions.length,
+          schedule_type:
+            newSession.selectedDays.length > 0 ? "weekly" : "custom",
+          selected_days: newSession.selectedDays,
+          class_dates:
+            newSession.selectedDays.length > 0
+              ? generateClassDates(
+                  newSession.startDate,
+                  newSession.endDate,
+                  newSession.selectedDays
+                )
+              : [],
+        };
 
-      setSessions([...sessions, session]);
+        // Add to Supabase
+        const addedSession = await addSessionToSupabase(sessionData);
 
-      // If this is the first session OR current session doesn't exist, set it as current
-      if (
-        sessions.length === 0 ||
-        !sessions.some((s) => s.name === currentSession)
-      ) {
-        setCurrentSession(session.name);
+        // The real-time subscription will update the state, but we can also update immediately
+        const formattedSession = {
+          id: addedSession.id,
+          name: addedSession.name,
+          type: addedSession.type,
+          startDate: addedSession.start_date,
+          endDate: addedSession.end_date,
+          isActive: addedSession.is_active,
+          order: addedSession.order_index,
+          scheduleType: addedSession.schedule_type,
+          selectedDays: addedSession.selected_days || [],
+          classDates: addedSession.class_dates || [],
+          createdAt: addedSession.created_at,
+        };
+
+        setSessions((prev) => [...prev, formattedSession]);
+
+        // If this is the first session OR current session doesn't exist, set it as current
+        if (
+          sessions.length === 0 ||
+          !sessions.some((s) => s.name === currentSession)
+        ) {
+          setCurrentSession(formattedSession.name);
+        }
+
+        // Reset form
+        setNewSession({
+          name: "",
+          type: "general",
+          startDate: "",
+          endDate: "",
+          selectedDays: [],
+        });
+
+        alert(`Session "${sessionData.name}" created successfully!`);
+      } catch (error) {
+        console.error("Error adding session:", error);
+        alert("Failed to add session: " + error.message);
       }
-
-      // Reset form
-      setNewSession({
-        name: "",
-        type: "general",
-        startDate: "",
-        endDate: "",
-        selectedDays: [],
-      });
     };
 
-    const updateSession = (sessionId, updates) => {
-      setSessions(
-        sessions.map((s) => (s.id === sessionId ? { ...s, ...updates } : s))
-      );
+    const updateSession = async (sessionId, updates) => {
+      try {
+        // Prepare updates for Supabase (convert to snake_case)
+        const supabaseUpdates = {};
 
-      // Update currentSession if the name changed
-      if (
-        updates.name &&
-        currentSession === sessions.find((s) => s.id === sessionId)?.name
-      ) {
-        setCurrentSession(updates.name);
+        if (updates.name !== undefined) supabaseUpdates.name = updates.name;
+        if (updates.type !== undefined) supabaseUpdates.type = updates.type;
+        if (updates.startDate !== undefined)
+          supabaseUpdates.start_date = updates.startDate;
+        if (updates.endDate !== undefined)
+          supabaseUpdates.end_date = updates.endDate;
+        if (updates.isActive !== undefined)
+          supabaseUpdates.is_active = updates.isActive;
+        if (updates.order !== undefined)
+          supabaseUpdates.order_index = updates.order;
+        if (updates.selectedDays !== undefined)
+          supabaseUpdates.selected_days = updates.selectedDays;
+        if (updates.classDates !== undefined)
+          supabaseUpdates.class_dates = updates.classDates;
+
+        // Update in Supabase
+        await updateSessionInSupabase(sessionId, supabaseUpdates);
+
+        // Update local state immediately for UI responsiveness
+        setSessions(
+          sessions.map((s) => (s.id === sessionId ? { ...s, ...updates } : s))
+        );
+
+        // Update currentSession if the name changed
+        if (
+          updates.name &&
+          currentSession === sessions.find((s) => s.id === sessionId)?.name
+        ) {
+          setCurrentSession(updates.name);
+        }
+
+        setEditingSession(null);
+      } catch (error) {
+        console.error("Error updating session:", error);
+        alert("Failed to update session: " + error.message);
       }
-
-      setEditingSession(null);
     };
 
-    const archiveSession = (sessionId) => {
+    const archiveSession = async (sessionId) => {
       const session = sessions.find((s) => s.id === sessionId);
       if (session && session.name === currentSession) {
         alert(
@@ -3280,20 +3656,40 @@ const VEXLifetimeAchievementSystem = () => {
         return;
       }
 
-      setSessions(
-        sessions.map((s) =>
-          s.id === sessionId ? { ...s, isActive: false } : s
-        )
-      );
+      try {
+        // Update in Supabase
+        await updateSessionInSupabase(sessionId, { is_active: false });
+
+        // Update local state
+        setSessions(
+          sessions.map((s) =>
+            s.id === sessionId ? { ...s, isActive: false } : s
+          )
+        );
+      } catch (error) {
+        console.error("Error archiving session:", error);
+        alert("Failed to archive session: " + error.message);
+      }
     };
 
-    const unarchiveSession = (sessionId) => {
-      setSessions(
-        sessions.map((s) => (s.id === sessionId ? { ...s, isActive: true } : s))
-      );
+    const unarchiveSession = async (sessionId) => {
+      try {
+        // Update in Supabase
+        await updateSessionInSupabase(sessionId, { is_active: true });
+
+        // Update local state
+        setSessions(
+          sessions.map((s) =>
+            s.id === sessionId ? { ...s, isActive: true } : s
+          )
+        );
+      } catch (error) {
+        console.error("Error unarchiving session:", error);
+        alert("Failed to unarchive session: " + error.message);
+      }
     };
 
-    const moveSession = (sessionId, direction) => {
+    const moveSession = async (sessionId, direction) => {
       const sessionList = showArchived ? archivedSessions : activeSessions;
       const index = sessionList.findIndex((s) => s.id === sessionId);
       if (
@@ -3305,14 +3701,30 @@ const VEXLifetimeAchievementSystem = () => {
       const newOrder = direction === "up" ? index - 1 : index + 1;
       const otherSession = sessionList[newOrder];
 
-      setSessions(
-        sessions.map((s) => {
-          if (s.id === sessionId) return { ...s, order: otherSession.order };
-          if (s.id === otherSession.id)
-            return { ...s, order: sessionList[index].order };
-          return s;
-        })
-      );
+      try {
+        // Update both sessions in Supabase
+        await Promise.all([
+          updateSessionInSupabase(sessionId, {
+            order_index: otherSession.order,
+          }),
+          updateSessionInSupabase(otherSession.id, {
+            order_index: sessionList[index].order,
+          }),
+        ]);
+
+        // Update local state
+        setSessions(
+          sessions.map((s) => {
+            if (s.id === sessionId) return { ...s, order: otherSession.order };
+            if (s.id === otherSession.id)
+              return { ...s, order: sessionList[index].order };
+            return s;
+          })
+        );
+      } catch (error) {
+        console.error("Error reordering sessions:", error);
+        alert("Failed to reorder sessions: " + error.message);
+      }
     };
 
     const sessionTypeInfo = {
@@ -3741,6 +4153,13 @@ const VEXLifetimeAchievementSystem = () => {
     // Initialize with next class date or today
     const getDefaultDate = () => {
       const today = new Date().toISOString().split("T")[0];
+
+      // Add safety check for currentSessionObj
+      if (!currentSessionObj) {
+        console.warn("No current session found");
+        return today;
+      }
+
       if (currentSessionObj?.classDates?.length > 0) {
         // Find the next upcoming class date or most recent past date
         const futureDates = currentSessionObj.classDates.filter(
