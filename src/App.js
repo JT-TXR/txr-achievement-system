@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { User, Calendar, Award, Trophy } from 'lucide-react';
+import { supabase } from "./lib/supabase";
+import Auth from "./components/Auth";
+import { User, Calendar, Award, Trophy } from "lucide-react";
 import { initializeTestData } from "./testData";
 import NavigationBar from "./NavigationBar";
 import UnifiedXPAwardModal from "./UnifiedXPAwardModal";
@@ -25,6 +27,26 @@ import CompetitionHonorsModal from "./CompetitionHonorsModal";
 import LevelRoadmap from "./LevelProgressionRoadmap.js";
 
 const VEXLifetimeAchievementSystem = () => {
+  const [session, setSession] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    // Check current session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setAuthLoading(false);
+    });
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
   // Enhanced data structure with lifetime and session tracking
   const [students, setStudents] = useState([]);
   const [achievements, setAchievements] = useState([
@@ -7100,7 +7122,11 @@ const VEXLifetimeAchievementSystem = () => {
     );
   };
 
-  const StudentDetail = ({ studentId, setCurrentViewingStudent, setShowLevelRoadmap }) => {
+  const StudentDetail = ({
+    studentId,
+    setCurrentViewingStudent,
+    setShowLevelRoadmap,
+  }) => {
     if (!selectedStudentId) return null;
 
     // Always get fresh data from students array
@@ -7113,9 +7139,12 @@ const VEXLifetimeAchievementSystem = () => {
 
     const lifetimeLevel = getStudentLevel(currentStudent.lifetimeXP || 0);
     const nextLevel = levels[lifetimeLevel.level] || levels[levels.length - 1];
-    const xpProgress = lifetimeLevel.level < 15 
-      ? ((currentStudent.lifetimeXP - lifetimeLevel.minXP) / (nextLevel.minXP - lifetimeLevel.minXP)) * 100
-      : 100;
+    const xpProgress =
+      lifetimeLevel.level < 15
+        ? ((currentStudent.lifetimeXP - lifetimeLevel.minXP) /
+            (nextLevel.minXP - lifetimeLevel.minXP)) *
+          100
+        : 100;
     const sessionXP = getSessionXP(currentStudent);
     const earnedMilestones = getStudentMilestones(currentStudent.id);
 
@@ -7282,84 +7311,99 @@ const VEXLifetimeAchievementSystem = () => {
           </div>
 
           {/* Level Progress Section */}
-<div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-  <div className="flex items-center justify-between mb-4">
-    <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-      <Trophy className="w-6 h-6 text-yellow-500" />
-      Level Progress
-    </h3>
-    <button
-      onClick={() => {
-        setCurrentViewingStudent(currentStudent);
-        setShowLevelRoadmap(true);
-      }}
-      className="text-sm text-purple-600 hover:text-purple-700 font-medium"
-    >
-      View Full Roadmap →
-    </button>
-  </div>
+          <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                <Trophy className="w-6 h-6 text-yellow-500" />
+                Level Progress
+              </h3>
+              <button
+                onClick={() => {
+                  setCurrentViewingStudent(currentStudent);
+                  setShowLevelRoadmap(true);
+                }}
+                className="text-sm text-purple-600 hover:text-purple-700 font-medium"
+              >
+                View Full Roadmap →
+              </button>
+            </div>
 
-  {/* Current Level Badge */}
-  <div className="text-center mb-4">
-    <div className={`inline-flex items-center px-4 py-2 rounded-lg font-bold text-lg ${
-      lifetimeLevel.level >= 14 
-        ? 'bg-gradient-to-r from-red-500 via-yellow-500 to-blue-500 text-white' 
-        : lifetimeLevel.level >= 11 
-        ? 'bg-yellow-400 text-yellow-900 ring-2 ring-yellow-500'
-        : `${lifetimeLevel.color} text-white`
-    }`}>
-      Level {lifetimeLevel.level}: {lifetimeLevel.name}
-    </div>
-  </div>
+            {/* Current Level Badge */}
+            <div className="text-center mb-4">
+              <div
+                className={`inline-flex items-center px-4 py-2 rounded-lg font-bold text-lg ${
+                  lifetimeLevel.level >= 14
+                    ? "bg-gradient-to-r from-red-500 via-yellow-500 to-blue-500 text-white"
+                    : lifetimeLevel.level >= 11
+                    ? "bg-yellow-400 text-yellow-900 ring-2 ring-yellow-500"
+                    : `${lifetimeLevel.color} text-white`
+                }`}
+              >
+                Level {lifetimeLevel.level}: {lifetimeLevel.name}
+              </div>
+            </div>
 
-  {/* XP Display */}
-  <div className="flex justify-between items-center mb-2">
-    <span className="text-sm text-gray-600">Lifetime XP</span>
-    <span className="text-xl font-bold text-orange-600">{currentStudent.lifetimeXP.toLocaleString()}</span>
-  </div>
+            {/* XP Display */}
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm text-gray-600">Lifetime XP</span>
+              <span className="text-xl font-bold text-orange-600">
+                {currentStudent.lifetimeXP.toLocaleString()}
+              </span>
+            </div>
 
-  <div className="relative">
-  {/* Progress bar labels */}
-  <div className="flex justify-between text-sm text-gray-500 mb-2">
-    <span>Level {lifetimeLevel.level}: {lifetimeLevel.minXP.toLocaleString()} XP</span>
-    <span>Level {nextLevel.level}: {nextLevel.minXP.toLocaleString()} XP</span>
-  </div>
-  
-  {/* Progress bar */}
-  <div className="w-full bg-gray-200 rounded-full h-3 mb-1">
-    <div
-      className="h-full bg-gradient-to-r from-orange-400 to-orange-600 rounded-full transition-all duration-500"
-      style={{ width: `${xpProgress}%` }}
-    />
-  </div>
-  
-  {/* Current XP indicator below */}
-  <div className="relative h-6">
-    <div 
-      className="absolute transform -translate-x-1/2 transition-all duration-500"
-      style={{ left: `${Math.min(Math.max(xpProgress, 10), 90)}%` }}
-    >
-      <div className="text-xs font-semibold text-gray-700 whitespace-nowrap">
-        <div className="w-0.5 h-2 bg-gray-400 mx-auto mb-0.5"></div>
-        {currentStudent.lifetimeXP.toLocaleString()} XP
-      </div>
-    </div>
-  </div>
-  
-  {/* Progress summary */}
-  <p className="text-center text-sm text-gray-600 mt-2">
-    {Math.round(xpProgress)}% complete • {(nextLevel.minXP - currentStudent.lifetimeXP).toLocaleString()} XP to Level {nextLevel.level}
-  </p>
-</div>
+            <div className="relative">
+              {/* Progress bar labels */}
+              <div className="flex justify-between text-sm text-gray-500 mb-2">
+                <span>
+                  Level {lifetimeLevel.level}:{" "}
+                  {lifetimeLevel.minXP.toLocaleString()} XP
+                </span>
+                <span>
+                  Level {nextLevel.level}: {nextLevel.minXP.toLocaleString()} XP
+                </span>
+              </div>
 
-  {/* Max Level Celebration */}
-  {lifetimeLevel.level === 15 && (
-    <div className="text-center mt-4 p-4 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg">
-      <p className="font-bold text-lg text-gray-800">🎉 Maximum Level Achieved!</p>
-      <p className="text-sm text-gray-600">TXR Immortal - The Ultimate Achievement!</p>
-    </div>
-  )}
-</div>
+              {/* Progress bar */}
+              <div className="w-full bg-gray-200 rounded-full h-3 mb-1">
+                <div
+                  className="h-full bg-gradient-to-r from-orange-400 to-orange-600 rounded-full transition-all duration-500"
+                  style={{ width: `${xpProgress}%` }}
+                />
+              </div>
+
+              {/* Current XP indicator below */}
+              <div className="relative h-6">
+                <div
+                  className="absolute transform -translate-x-1/2 transition-all duration-500"
+                  style={{ left: `${Math.min(Math.max(xpProgress, 10), 90)}%` }}
+                >
+                  <div className="text-xs font-semibold text-gray-700 whitespace-nowrap">
+                    <div className="w-0.5 h-2 bg-gray-400 mx-auto mb-0.5"></div>
+                    {currentStudent.lifetimeXP.toLocaleString()} XP
+                  </div>
+                </div>
+              </div>
+
+              {/* Progress summary */}
+              <p className="text-center text-sm text-gray-600 mt-2">
+                {Math.round(xpProgress)}% complete •{" "}
+                {(nextLevel.minXP - currentStudent.lifetimeXP).toLocaleString()}{" "}
+                XP to Level {nextLevel.level}
+              </p>
+            </div>
+
+            {/* Max Level Celebration */}
+            {lifetimeLevel.level === 15 && (
+              <div className="text-center mt-4 p-4 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg">
+                <p className="font-bold text-lg text-gray-800">
+                  🎉 Maximum Level Achieved!
+                </p>
+                <p className="text-sm text-gray-600">
+                  TXR Immortal - The Ultimate Achievement!
+                </p>
+              </div>
+            )}
+          </div>
 
           {/* Tournament History Section */}
           {studentTournamentHistory.length > 0 && (
@@ -8081,13 +8125,39 @@ const VEXLifetimeAchievementSystem = () => {
     );
   };
 
+  // Add loading check
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-lg">Loading...</div>
+      </div>
+    );
+  }
+
+  // Add auth check
+  if (!session) {
+    return <Auth />;
+  }
+
   // Main Render
   return (
     <div className="min-h-screen bg-gray-100">
+      {/* Add this auth info bar */}
+      <div className="bg-white shadow-sm border-b px-4 py-2 flex justify-between items-center">
+        <span className="text-sm text-gray-600">
+          Logged in as: {session.user.email}
+        </span>
+        <button
+          onClick={() => supabase.auth.signOut()}
+          className="text-sm px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
+        >
+          Sign Out
+        </button>
+      </div>
       <NavigationBar
         // View state
         onRoadmapClick={() => {
-          setCurrentViewingStudent(null);  // No specific student
+          setCurrentViewingStudent(null); // No specific student
           setShowLevelRoadmap(true);
         }}
         currentView={currentView}
@@ -8359,13 +8429,13 @@ const VEXLifetimeAchievementSystem = () => {
           </div>
         )}
       </div>
-      {selectedStudentId && 
-        <StudentDetail 
-          studentId={selectedStudentId} 
+      {selectedStudentId && (
+        <StudentDetail
+          studentId={selectedStudentId}
           setCurrentViewingStudent={setCurrentViewingStudent}
           setShowLevelRoadmap={setShowLevelRoadmap}
         />
-      }
+      )}
       {showSessionManager && <SessionManager />}
       {showAttendanceManager && <AttendanceManager />}
       {showStudentManager && <StudentManager />}
@@ -8424,17 +8494,17 @@ const VEXLifetimeAchievementSystem = () => {
           onClose={() => setShowAttendanceReport(false)}
         />
       )}
-{showLevelRoadmap && (
-  <LevelRoadmap 
-    currentXP={currentViewingStudent?.lifetimeXP || 0}
-    studentName={currentViewingStudent?.name}
-    animateView={!currentViewingStudent}  // Animate when no specific student
-    onClose={() => {
-      setShowLevelRoadmap(false);
-      setCurrentViewingStudent(null);
-    }} 
-  />
-)}
+      {showLevelRoadmap && (
+        <LevelRoadmap
+          currentXP={currentViewingStudent?.lifetimeXP || 0}
+          studentName={currentViewingStudent?.name}
+          animateView={!currentViewingStudent} // Animate when no specific student
+          onClose={() => {
+            setShowLevelRoadmap(false);
+            setCurrentViewingStudent(null);
+          }}
+        />
+      )}
       {showTournamentWizard && <TournamentWizard />}
       {showTournamentDashboard && <TournamentDashboard />}
       {showTournamentHistory && (
