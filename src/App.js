@@ -788,12 +788,12 @@ const VEXLifetimeAchievementSystem = () => {
     console.log("Existing students:", existingStudents ? "Found" : "None");
     console.log("Existing sessions:", existingSessions ? "Found" : "None");
 
-    if (!migrated && !existingStudents) {
-      console.log("Initializing test data for first time...");
-      initializeTestData();
-    } else {
-      console.log("Skipping test data init - already have data");
-    }
+    // if (!migrated && !existingStudents) {
+    //   console.log("Initializing test data for first time...");
+    //   initializeTestData();
+    // } else {
+    //   console.log("Skipping test data init - already have data");
+    // }
 
     const savedStudents = localStorage.getItem("vexLifetimeStudents");
     const savedAchievements = localStorage.getItem("vexAchievements");
@@ -1133,9 +1133,10 @@ const VEXLifetimeAchievementSystem = () => {
         lifetimeXP: updatedStudent.lifetimeXP,
         sessionXP: updatedStudent.sessionXP,
       });
+      console.log("XP updated in database");
     } catch (error) {
       console.error("Failed to update XP in database:", error);
-      // Optionally revert the local change if database update fails
+      // Consider reverting local state if save fails
     }
   };
 
@@ -1624,68 +1625,107 @@ const VEXLifetimeAchievementSystem = () => {
   };
 
   // Add new student
-  const addStudent = (name, program) => {
-    const newStudent = {
-      id: Date.now(),
-      name,
-      program,
-      lifetimeXP: 0,
-      sessionXP: { [currentSession]: 0 },
-      achievements: [],
-      sessionAchievements: {},
-      avatar: "🤖",
-      joinDate: new Date().toISOString(),
-      sessionsAttended: [currentSession],
-      enrolledSessions: [currentSession], // Add this line - auto-enroll in current session
+  const addStudent = async (name, program) => {
+    try {
+      const studentData = {
+        name,
+        program,
+        lifetimeXP: 0,
+        lifetimeLevel: 1,
+        sessionXP: { [currentSession]: 0 },
+        achievements: [],
+        sessionAchievements: {},
+        avatar: "🤖",
+        joinDate: new Date().toISOString(),
+        sessionsAttended: [currentSession],
+        enrolledSessions: [currentSession],
+        tournamentHistory: [],
+        personalBests: {
+          teamwork: {
+            highScore: 0,
+            averageScore: 0,
+            tournamentId: null,
+            tournamentName: null,
+            date: null,
+            partner: null,
+          },
+          driverSkills: {
+            highScore: 0,
+            tournamentId: null,
+            tournamentName: null,
+            date: null,
+          },
+          autonomousSkills: {
+            highScore: 0,
+            tournamentId: null,
+            tournamentName: null,
+            date: null,
+          },
+          combinedSkills: {
+            highScore: 0,
+            tournamentId: null,
+            tournamentName: null,
+            date: null,
+          },
+        },
+        tournamentStats: {
+          totalTournaments: 0,
+          championships: 0,
+          podiumFinishes: 0,
+          averagePlacement: 0,
+          favoritePartners: [],
+        },
+      };
 
-      tournamentHistory: [],
-      personalBests: {
-        teamwork: {
-          highScore: 0,
-          averageScore: 0,
-          tournamentId: null,
-          tournamentName: null,
-          date: null,
-          partner: null,
-        },
-        driverSkills: {
-          highScore: 0,
-          tournamentId: null,
-          tournamentName: null,
-          date: null,
-        },
-        autonomousSkills: {
-          highScore: 0,
-          tournamentId: null,
-          tournamentName: null,
-          date: null,
-        },
-        combinedSkills: {
-          highScore: 0,
-          tournamentId: null,
-          tournamentName: null,
-          date: null,
-        },
-      },
-      tournamentStats: {
-        totalTournaments: 0,
-        championships: 0,
-        podiumFinishes: 0,
-        averagePlacement: 0,
-        favoritePartners: [],
-      },
-    };
-    setStudents([...students, newStudent]);
+      // Add to Supabase
+      const addedStudent = await addStudentToSupabase(studentData);
+
+      // Real-time subscription will update the state automatically
+      // But we can also update immediately for instant feedback
+      console.log("Student added successfully:", addedStudent.name);
+
+      // Show success message
+      alert(`${name} has been added successfully!`);
+    } catch (error) {
+      console.error("Error adding student:", error);
+      alert("Failed to add student: " + error.message);
+    }
+  };
+
+  const editStudent = async (studentId, updates) => {
+    try {
+      await updateStudentInSupabase(studentId, updates);
+      console.log("Student updated successfully");
+
+      // Real-time subscription will update the state
+      // Optional: Show success message
+      if (updates.name) {
+        alert(`${updates.name} updated successfully!`);
+      }
+    } catch (error) {
+      console.error("Error updating student:", error);
+      alert("Failed to update student: " + error.message);
+    }
   };
 
   // Remove student
-  const removeStudent = (studentId) => {
+  const removeStudent = async (studentId) => {
+    const student = students.find((s) => s.id === studentId);
+    if (!student) return;
+
     if (
       window.confirm(
-        "Are you sure you want to remove this student? This cannot be undone."
+        `Are you sure you want to remove ${student.name}? This cannot be undone.`
       )
     ) {
-      setStudents(students.filter((s) => s.id !== studentId));
+      try {
+        await deleteStudentFromSupabase(studentId);
+        console.log("Student removed successfully");
+        alert(`${student.name} has been removed.`);
+      } catch (error) {
+        console.error("Error removing student:", error);
+        alert("Failed to remove student: " + error.message);
+      }
     }
   };
 
@@ -1737,53 +1777,70 @@ const VEXLifetimeAchievementSystem = () => {
     const [newStudentProgram, setNewStudentProgram] = useState("VEX IQ");
     const [searchFilter, setSearchFilter] = useState("");
 
-    const handleAddStudent = async () => {
-      if (!newStudent.name) {
+    const handleAddStudent = async (newStudent) => {
+      // Check if newStudent has the required fields
+      if (!newStudent || !newStudent.name) {
         alert("Please enter a student name");
         return;
       }
 
       try {
-        // Prepare the student data
         const studentData = {
           name: newStudent.name,
+          program: newStudent.program || "VEX IQ",
           email: newStudent.email || null,
           grade: newStudent.grade || null,
           lifetimeXP: 0,
           lifetimeLevel: 1,
-          sessionXP: {},
-          sessionsAttended: [],
-          enrolledSessions:
-            editMode === "enroll" && currentSession ? [currentSession] : [],
+          sessionXP: { [currentSession]: 0 },
+          achievements: [],
           sessionAchievements: {},
-          lifetimeAchievements: [],
-          avatarStyle: {},
+          avatar: "🤖",
+          joinDate: new Date().toISOString(),
+          sessionsAttended: [currentSession],
+          enrolledSessions: [currentSession],
+          tournamentHistory: [],
+          personalBests: {
+            teamwork: {
+              highScore: 0,
+              averageScore: 0,
+              tournamentId: null,
+              tournamentName: null,
+              date: null,
+              partner: null,
+            },
+            driverSkills: {
+              highScore: 0,
+              tournamentId: null,
+              tournamentName: null,
+              date: null,
+            },
+            autonomousSkills: {
+              highScore: 0,
+              tournamentId: null,
+              tournamentName: null,
+              date: null,
+            },
+            combinedSkills: {
+              highScore: 0,
+              tournamentId: null,
+              tournamentName: null,
+              date: null,
+            },
+          },
+          tournamentStats: {
+            totalTournaments: 0,
+            championships: 0,
+            podiumFinishes: 0,
+            averagePlacement: 0,
+            favoritePartners: [],
+          },
         };
 
         // Add to Supabase
         const addedStudent = await addStudentToSupabase(studentData);
-
-        // The real-time subscription will automatically update the local state
-        // But we can manually update for immediate feedback
-        const formattedStudent = {
-          ...addedStudent,
-          lifetimeXP: addedStudent.lifetime_xp,
-          lifetimeLevel: addedStudent.lifetime_level,
-          sessionXP: addedStudent.session_xp,
-          sessionsAttended: addedStudent.sessions_attended,
-          enrolledSessions: addedStudent.enrolled_sessions,
-          sessionAchievements: addedStudent.session_achievements,
-          lifetimeAchievements: addedStudent.lifetime_achievements,
-          avatarStyle: addedStudent.avatar_style,
-        };
-
-        setStudents((prev) => [...prev, formattedStudent]);
-
-        // Reset form
-        setNewStudent({ name: "", email: "", grade: "" });
-
-        // Show success message
-        alert(`${studentData.name} added successfully!`);
+        console.log("Student added successfully:", addedStudent.name);
+        alert(`${newStudent.name} has been added successfully!`);
       } catch (error) {
         console.error("Error adding student:", error);
         alert("Failed to add student: " + error.message);
@@ -1792,44 +1849,35 @@ const VEXLifetimeAchievementSystem = () => {
 
     const handleUpdateStudent = async (studentId, updates) => {
       try {
-        // Update in Supabase
         await updateStudentInSupabase(studentId, updates);
+        console.log("Student updated successfully");
 
-        // The real-time subscription will handle the state update
-        // But we can update immediately for better UX
-        setStudents((prev) =>
-          prev.map((s) => (s.id === studentId ? { ...s, ...updates } : s))
-        );
-
-        // Close edit modal if you have one
-        setEditingStudent(null);
+        if (updates.name) {
+          alert(`${updates.name} updated successfully!`);
+        }
       } catch (error) {
         console.error("Error updating student:", error);
         alert("Failed to update student: " + error.message);
       }
     };
 
-    const handleDeleteStudent = async (studentId, studentName) => {
+    const handleDeleteStudent = async (studentId) => {
+      const student = students.find((s) => s.id === studentId);
+      if (!student) return;
+
       if (
-        !window.confirm(
-          `Are you sure you want to delete ${studentName}? This cannot be undone.`
+        window.confirm(
+          `Are you sure you want to remove ${student.name}? This cannot be undone.`
         )
       ) {
-        return;
-      }
-
-      try {
-        // Delete from Supabase
-        await deleteStudentFromSupabase(studentId);
-
-        // The real-time subscription will handle the state update
-        // But we can update immediately for better UX
-        setStudents((prev) => prev.filter((s) => s.id !== studentId));
-
-        alert(`${studentName} has been deleted.`);
-      } catch (error) {
-        console.error("Error deleting student:", error);
-        alert("Failed to delete student: " + error.message);
+        try {
+          await deleteStudentFromSupabase(studentId);
+          console.log("Student removed successfully");
+          alert(`${student.name} has been removed.`);
+        } catch (error) {
+          console.error("Error removing student:", error);
+          alert("Failed to remove student: " + error.message);
+        }
       }
     };
 
