@@ -1,6 +1,13 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { supabase } from "./lib/supabase";
 import Auth from "./components/Auth";
+import {
+  fetchStudents,
+  subscribeToStudents,
+  dbStudentToApp,
+} from "./lib/studentOperations";
+import { migrateStudentsToSupabase } from "./utils/migrateToSupabase";
+
 import { User, Calendar, Award, Trophy } from "lucide-react";
 import { initializeTestData } from "./testData";
 import NavigationBar from "./NavigationBar";
@@ -46,6 +53,259 @@ const VEXLifetimeAchievementSystem = () => {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (session) {
+      loadStudentsFromSupabase();
+    }
+  }, [session]);
+
+  // Add this function
+  const loadStudentsFromSupabase = async () => {
+    try {
+      // Check if we need to migrate
+      const migrated = localStorage.getItem("vexStudents_migrated");
+      if (!migrated) {
+        const result = await migrateStudentsToSupabase();
+        if (result.success) {
+          console.log(result.message);
+        }
+      }
+
+      // Fetch students from Supabase
+      const dbStudents = await fetchStudents();
+      const appStudents = dbStudents.map(dbStudentToApp);
+      setStudents(appStudents);
+
+      // Subscribe to real-time changes
+      const subscription = subscribeToStudents((payload) => {
+        if (payload.eventType === "INSERT") {
+          setStudents((prev) => [...prev, dbStudentToApp(payload.new)]);
+        } else if (payload.eventType === "UPDATE") {
+          setStudents((prev) =>
+            prev.map((s) =>
+              s.id === payload.new.id ? dbStudentToApp(payload.new) : s
+            )
+          );
+        } else if (payload.eventType === "DELETE") {
+          setStudents((prev) => prev.filter((s) => s.id !== payload.old.id));
+        }
+      });
+
+      // Cleanup subscription on unmount
+      return () => {
+        subscription.unsubscribe();
+      };
+    } catch (error) {
+      console.error("Error loading students:", error);
+    }
+  };
+  const DebugPanel = () => {
+    const [debugInfo, setDebugInfo] = useState({
+      localStudents: 0,
+      migrationStatus: "Not checked",
+      supabaseStudents: 0,
+      currentUser: null,
+      errors: [],
+    });
+
+    const cleanupDuplicates = async () => {
+      try {
+        // First, let's see what we have
+        const { data: allStudents, error } = await supabase
+          .from("students")
+          .select("*")
+          .order("created_at");
+
+        if (error) throw error;
+
+        console.log(`Found ${allStudents.length} total students`);
+
+        // Group by name to find duplicates
+        const studentsByName = {};
+        allStudents.forEach((student) => {
+          if (!studentsByName[student.name]) {
+            studentsByName[student.name] = [];
+          }
+          studentsByName[student.name].push(student);
+        });
+
+        // Find and remove duplicates (keep the first one)
+        let duplicatesRemoved = 0;
+        for (const name in studentsByName) {
+          const students = studentsByName[name];
+          if (students.length > 1) {
+            console.log(`Found ${students.length} copies of ${name}`);
+            // Keep the first one, delete the rest
+            for (let i = 1; i < students.length; i++) {
+              const { error: deleteError } = await supabase
+                .from("students")
+                .delete()
+                .eq("id", students[i].id);
+
+              if (!deleteError) {
+                duplicatesRemoved++;
+              }
+            }
+          }
+        }
+
+        console.log(`Removed ${duplicatesRemoved} duplicate students`);
+        alert(`Cleanup complete! Removed ${duplicatesRemoved} duplicates.`);
+
+        // Refresh the page to see clean data
+        window.location.reload();
+      } catch (error) {
+        console.error("Cleanup error:", error);
+        alert("Error during cleanup: " + error.message);
+      }
+    };
+
+    const checkStatus = async () => {
+      try {
+        // Check localStorage - try both possible keys
+        let localStudents = JSON.parse(
+          localStorage.getItem("vexLifetimeStudents") || "[]"
+        );
+        if (localStudents.length === 0) {
+          localStudents = JSON.parse(
+            localStorage.getItem("vexStudents") || "[]"
+          );
+        }
+        const migrated = localStorage.getItem("vexStudents_migrated");
+
+        // Check current user
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        // Check profile
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user?.id)
+          .single();
+
+        // Check Supabase students
+        const { data: students, error } = await supabase
+          .from("students")
+          .select("*");
+
+        setDebugInfo({
+          localStudents: localStudents.length,
+          migrationStatus: migrated
+            ? `Migrated at ${migrated}`
+            : "Not migrated",
+          supabaseStudents: students?.length || 0,
+          currentUser: user?.email,
+          userRole: profile?.role,
+          errors: error ? [error.message] : [],
+        });
+      } catch (error) {
+        setDebugInfo((prev) => ({
+          ...prev,
+          errors: [...prev.errors, error.message],
+        }));
+      }
+    };
+
+    const runMigration = async () => {
+      try {
+        const result = await migrateStudentsToSupabase();
+        alert(result.message || "Migration complete");
+        checkStatus(); // Refresh status
+        window.location.reload(); // Reload to see migrated students
+      } catch (error) {
+        alert("Migration error: " + error.message);
+      }
+    };
+
+    const clearMigrationFlag = () => {
+      localStorage.removeItem("vexStudents_migrated");
+      alert("Migration flag cleared. Refresh to run migration again.");
+    };
+
+    useEffect(() => {
+      checkStatus();
+    }, []);
+
+    return (
+      <div className="fixed bottom-4 right-4 bg-white p-4 rounded-lg shadow-lg border max-w-sm">
+        <h3 className="font-bold text-lg mb-2">🐛 Debug Panel</h3>
+
+        <div className="space-y-2 text-sm">
+          <div>
+            <strong>Current User:</strong> {debugInfo.currentUser || "None"}
+          </div>
+          <div>
+            <strong>User Role:</strong> {debugInfo.userRole || "Not set"}
+          </div>
+          <div>
+            <strong>Local Students:</strong> {debugInfo.localStudents}
+          </div>
+          <div>
+            <strong>Supabase Students:</strong> {debugInfo.supabaseStudents}
+          </div>
+          <div>
+            <strong>Migration Status:</strong> {debugInfo.migrationStatus}
+          </div>
+
+          {debugInfo.errors.length > 0 && (
+            <div className="text-red-600">
+              <strong>Errors:</strong>
+              {debugInfo.errors.map((err, i) => (
+                <div key={i} className="text-xs">
+                  {err}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="mt-3 space-y-2">
+          <button
+            onClick={checkStatus}
+            className="w-full px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
+          >
+            Refresh Status
+          </button>
+
+          {debugInfo.localStudents > 0 && debugInfo.supabaseStudents === 0 && (
+            <button
+              onClick={runMigration}
+              className="w-full px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600"
+            >
+              Run Migration Now
+            </button>
+          )}
+
+          {debugInfo.migrationStatus !== "Not migrated" && (
+            <button
+              onClick={clearMigrationFlag}
+              className="w-full px-3 py-1 bg-yellow-500 text-white rounded text-sm hover:bg-yellow-600"
+            >
+              Clear Migration Flag
+            </button>
+          )}
+          {debugInfo.supabaseStudents > 12 && (
+            <button
+              onClick={cleanupDuplicates}
+              className="w-full px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600"
+            >
+              Clean Up Duplicates ({debugInfo.supabaseStudents - 12} extras)
+            </button>
+          )}
+
+          <button
+            onClick={() => setShowDebugPanel(false)}
+            className="w-full px-3 py-1 bg-gray-500 text-white rounded text-sm hover:bg-gray-600"
+          >
+            Close Debug Panel
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   // Enhanced data structure with lifetime and session tracking
   const [students, setStudents] = useState([]);
@@ -231,6 +491,8 @@ const VEXLifetimeAchievementSystem = () => {
     },
   ]);
 
+  const [showDebugPanel, setShowDebugPanel] = useState(true);
+
   const [currentSession, setCurrentSession] = useState("");
   const [sessions, setSessions] = useState([]);
   const [showSessionManager, setShowSessionManager] = useState(false);
@@ -358,7 +620,15 @@ const VEXLifetimeAchievementSystem = () => {
 
   // Load data on mount
   useEffect(() => {
-    initializeTestData();
+    const migrated = localStorage.getItem("vexStudents_migrated");
+    const existingStudents = localStorage.getItem("vexLifetimeStudents");
+
+    if (!migrated && !existingStudents) {
+      console.log("Initializing test data for first time...");
+      initializeTestData();
+    } else {
+      console.log("Skipping test data init - already have data");
+    }
 
     const savedStudents = localStorage.getItem("vexLifetimeStudents");
     const savedAchievements = localStorage.getItem("vexAchievements");
@@ -8436,6 +8706,7 @@ const VEXLifetimeAchievementSystem = () => {
           setShowLevelRoadmap={setShowLevelRoadmap}
         />
       )}
+      {showDebugPanel && <DebugPanel />}
       {showSessionManager && <SessionManager />}
       {showAttendanceManager && <AttendanceManager />}
       {showStudentManager && <StudentManager />}
